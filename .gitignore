@@ -135,6 +135,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+mates-avanzadas/
 
 # Spyder project settings
 .spyderproject
