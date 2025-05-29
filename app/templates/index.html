@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Métodos de Optimización</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            width: 80%;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background-color: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            margin: 0;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .api-section {
+            margin-bottom: 30px;
+        }
+
+        .endpoint {
+            background-color: #f9f9f9;
+            border-left: 4px solid #2c3e50;
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .endpoint h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+
+        .method {
+            background-color: #2c3e50;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        code {
+            background-color: #f5f5f5;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 30px;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>🔺 Métodos de Optimización</h1>
+        <p>API para resolver problemas de programación lineal</p>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <h2>Bienvenido a la API de Métodos de Optimización</h2>
+            <p>Esta API permite resolver problemas de programación lineal utilizando diferentes métodos de optimización
+                y generar animaciones visuales de los resultados.</p>
+            <p>Disponemos de las siguientes implementaciones:</p>
+            <ul>
+                <li><strong>Método Simplex</strong>: Para problemas de programación lineal estándar.</li>
+                <li><strong>Método de la Gran M</strong>: Para problemas con restricciones de igualdad o variables
+                    artificiales.</li>
+                <li><strong>Método de las Dos Fases</strong>: Alternativa al método de la Gran M para problemas con
+                    restricciones de igualdad.</li>
+            </ul>
+        </div>
+
+        <div class="api-section card">
+            <h2>Documentación de la API</h2>
+
+            <div class="endpoint">
+                <h3><span class="method">GET</span> /api/casos</h3>
+                <p>Obtiene la lista de todos los ejemplos guardados.</p>
+                <p><strong>Respuesta</strong>: Array de objetos JSON con los casos de ejemplo.</p>
+            </div>
+
+            <div class="endpoint">
+                <h3><span class="method">POST</span> /api/resolver/simplex</h3>
+                <p>Resuelve un problema utilizando el método Simplex.</p>
+                <p><strong>Cuerpo de la petición</strong>:</p>
+                <pre>
+{
+  "c": [5, 7],
+  "A": [[2, 3], [1, 1], [1, 0]],
+  "b": [12, 5, 3],
+  "minimize": false,
+  "track_iterations": true
+}</pre>
+                <p><strong>Respuesta</strong>: Objeto JSON con la solución, valor óptimo y opcionalmente el historial de
+                    iteraciones.</p>
+            </div>
+
+            <div class="endpoint">
+                <h3><span class="method">POST</span> /api/resolver/granm</h3>
+                <p>Resuelve un problema utilizando el método de la Gran M.</p>
+                <p><strong>Cuerpo de la petición</strong>:</p>
+                <pre>
+{
+  "c": [5, 7],
+  "A": [[2, 3], [1, 1], [1, 0]],
+  "b": [12, 5, 3],
+  "minimize": false,
+  "eq_constraints": [0],
+  "track_iterations": true
+}</pre>
+                <p><strong>Respuesta</strong>: Objeto JSON con la solución, valor óptimo y opcionalmente el historial de
+                    iteraciones.</p>
+            </div>
+
+            <div class="endpoint">
+                <h3><span class="method">POST</span> /api/resolver/dosfases</h3>
+                <p>Resuelve un problema utilizando el método de las Dos Fases.</p>
+                <p><strong>Cuerpo de la petición</strong>:</p>
+                <pre>
+{
+  "c": [5, 7],
+  "A": [[2, 3], [1, 1], [1, 0]],
+  "b": [12, 5, 3],
+  "minimize": false,
+  "eq_constraints": [0],
+  "track_iterations": true
+}</pre>
+                <p><strong>Respuesta</strong>: Objeto JSON con la solución, valor óptimo y opcionalmente el historial de
+                    iteraciones.</p>
+            </div>
+
+            <div class="endpoint">
+                <h3><span class="method">POST</span> /api/animar</h3>
+                <p>Genera una animación visual para un problema resuelto.</p>
+                <p><strong>Cuerpo de la petición</strong>:</p>
+                <pre>
+{
+  "c": [5, 7],
+  "A": [[2, 3], [1, 1], [1, 0]],
+  "b": [12, 5, 3],
+  "solution": [3, 2],
+  "optimal_value": 29,
+  "minimize": false,
+  "method": "simplex"
+}</pre>
+                <p><strong>Respuesta</strong>: Objeto JSON con la URL del video generado.</p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>Métodos de Optimización © 2025</p>
+    </footer>
+</body>
+
+</html>

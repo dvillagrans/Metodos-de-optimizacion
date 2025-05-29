@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}Método Simplex - Métodos de Optimización{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-chart-line text-primary me-2"></i>Método Simplex
+        </h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-input-number me-2"></i>Datos del Problema
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('main.resolver_simplex') }}"> <!-- Botones de ejemplo -->
+                    <div class="mb-3" id="ejemplos-section-unique">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-star text-warning me-1"></i>Ejemplos Rápidos:
+                        </label>
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="loadExample('simplex', 0)" title="Maximizar: 5x₁ + 7x₂">
+                                <i class="fas fa-lightbulb me-1"></i>Ejemplo 1 - Producción
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="loadExample('simplex', 1)" title="Maximizar: 3x₁ + 4x₂ + 6x₃">
+                                <i class="fas fa-lightbulb me-1"></i>Ejemplo 2 - Transporte
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="loadExample('simplex', 2)" title="Maximizar: 0.2x₁ + 0.3x₂ + 0.1x₃">
+                                <i class="fas fa-lightbulb me-1"></i>Ejemplo 3 - Inversión
+                            </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearForm()">
+                                <i class="fas fa-eraser me-1"></i>Limpiar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="c" class="form-label">Función Objetivo (c):</label>
+                        <input type="text" class="form-control" id="c" name="c" placeholder="Ej: 3,2,1" required>
+                        <div class="form-text">Coeficientes separados por comas</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="A" class="form-label">Matriz de Restricciones (A):</label>
+                        <textarea class="form-control" id="A" name="A" rows="4" placeholder="1,2,1&#10;2,1,3&#10;1,1,1"
+                            required></textarea>
+                        <div class="form-text">Una fila por línea, coeficientes separados por comas</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="b" class="form-label">Vector de Recursos (b):</label>
+                        <input type="text" class="form-control" id="b" name="b" placeholder="Ej: 12,8,6" required>
+                        <div class="form-text">Valores separados por comas</div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="minimize" name="minimize">
+                                <label class="form-check-label" for="minimize">
+                                    Minimizar (por defecto se maximiza)
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="track_iterations"
+                                    name="track_iterations">
+                                <label class="form-check-label" for="track_iterations">
+                                    Mostrar iteraciones
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-calculator me-2"></i>Resolver
+                            </button>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <button type="submit" formaction="{{ url_for('main.generar_animacion_simplex') }}"
+                                class="btn btn-success w-100" id="animationButton">
+                                <span class="button-text">
+                                    <i class="fas fa-play me-2"></i>Resolver con Animación
+                                </span>
+                                <span class="button-loading d-none">
+                                    <i class="fas fa-spinner fa-spin me-2"></i>Generando animación...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        {% if resultado %}
+        <div class="result-section">
+            {% if resultado.success %}
+            <h4 class="text-success mb-3">
+                <i class="fas fa-check-circle me-2"></i>Solución Encontrada
+            </h4>
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6>Solución Óptima:</h6>
+                    <div class="row">
+                        {% for i in range(resultado.solution|length) %}
+                        <div class="col-auto">
+                            <span class="badge bg-primary">x{{ i+1 }} = {{ "%.4f"|format(resultado.solution[i])
+                                }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <hr>
+                    <h6>Valor Óptimo: <span class="text-success">{{ "%.4f"|format(resultado.optimal_value) }}</span>
+                    </h6>
+                </div>
+            </div>
+
+            {% if resultado.tableau_history %}
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-table me-2"></i>Iteraciones del Algoritmo
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="iterationsAccordion">
+                        {% for i in range(resultado.tableau_history|length) %}
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="heading{{ i }}">
+                                <button class="accordion-button {% if i != 0 %}collapsed{% endif %}" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#collapse{{ i }}">
+                                    Iteración {{ i + 1 }}
+                                    {% if i < resultado.pivot_history|length %} <small class="ms-2 text-muted">
+                                        (Pivote: fila {{ resultado.pivot_history[i][0] }}, columna {{
+                                        resultado.pivot_history[i][1] }})
+                                        </small>
+                                        {% endif %}
+                                </button>
+                            </h2>
+                            <div id="collapse{{ i }}" class="accordion-collapse collapse {% if i == 0 %}show{% endif %}"
+                                data-bs-parent="#iterationsAccordion">
+                                <div class="accordion-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm tableau-table">
+                                            {% for row_idx in range(resultado.tableau_history[i]|length) %}
+                                            <tr>
+                                                {% for col_idx in range(resultado.tableau_history[i][row_idx]|length) %}
+                                                <td
+                                                    class="{% if i < resultado.pivot_history|length and row_idx == resultado.pivot_history[i][0] and col_idx == resultado.pivot_history[i][1] %}pivot-cell{% endif %}">
+                                                    {{ "%.3f"|format(resultado.tableau_history[i][row_idx][col_idx]) }}
+                                                </td>
+                                                {% endfor %}
+                                            </tr>
+                                            {% endfor %}
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div> {% endif %}
+            {% endif %} {% if video_url or image_url %}
+            <div class="card mt-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        {% if video_url %}
+                        <i class="fas fa-film me-2"></i>Animación del Proceso
+                        {% else %}
+                        <i class="fas fa-image me-2"></i>Visualización del Proceso
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    {% if video_url %}
+                    <video width="100%" height="400" controls>
+                        <source src="{{ video_url }}" type="video/mp4">
+                        Tu navegador no soporta el elemento de video.
+                    </video>
+                    <p class="mt-2 text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Animación generada mostrando el proceso de resolución paso a paso
+                    </p>
+                    {% elif image_url %}
+                    <img src="{{ image_url }}" alt="Visualización del proceso" class="img-fluid"
+                        style="max-height: 400px;">
+                    <p class="mt-2 text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Visualización generada mostrando el proceso de resolución
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/examples.js') }}?v={{ range(100, 999) | random }}"></script>
+<style>
+    /* Ocultar cualquier sección duplicada de ejemplos */
+    .mb-3:not(#ejemplos-section-unique):has(.form-label:contains("Ejemplos Rápidos")) {
+        display: none !important;
+    }
+</style>
+<script>    // Eliminar duplicaciones si existen
+    document.addEventListener('DOMContentLoaded', function () {
+        const ejemplosSections = document.querySelectorAll('.mb-3');
+        let foundFirst = false;
+
+        ejemplosSections.forEach(function (section) {
+            const label = section.querySelector('.form-label');
+            if (label && label.textContent.includes('Ejemplos Rápidos')) {
+                if (!foundFirst) {
+                    foundFirst = true;
+                } else {
+                    section.style.display = 'none';
+                }
+            }
+        });        // Manejar el botón de animación con indicador de carga
+        const animationButton = document.getElementById('animationButton');
+        if (animationButton) {
+            animationButton.addEventListener('click', function (event) {
+                console.log('Animation button clicked'); // Debug log
+
+                const buttonText = this.querySelector('.button-text');
+                const buttonLoading = this.querySelector('.button-loading');
+
+                if (buttonText && buttonLoading) {
+                    // Cambiar el aspecto del botón inmediatamente
+                    buttonText.classList.add('d-none');
+                    buttonLoading.classList.remove('d-none');
+
+                    // Mostrar mensaje de estado en la página
+                    showProcessingMessage();
+
+                    // Deshabilitar el botón después de un pequeño delay para permitir el envío
+                    setTimeout(() => {
+                        this.disabled = true;
+                    }, 200);
+                }
+
+                // Asegurar que el formulario se envíe
+                const form = this.closest('form');
+                if (form) {
+                    console.log('Form found, submitting...'); // Debug log
+                    // No prevenir el comportamiento por defecto
+                }
+            });
+        }
+    });
+
+    function showProcessingMessage() {
+        // Crear o actualizar mensaje de procesamiento
+        let processingDiv = document.getElementById('processing-message');
+        if (!processingDiv) {
+            processingDiv = document.createElement('div');
+            processingDiv.id = 'processing-message';
+            processingDiv.className = 'alert alert-info mt-3';
+            processingDiv.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-cogs fa-spin me-3"></i>
+                    <div>
+                        <strong>Generando animación...</strong>
+                        <div class="small">Este proceso puede tomar algunos minutos. Por favor, espere.</div>
+                    </div>
+                </div>
+            `;
+
+            // Insertar después del formulario
+            const form = document.querySelector('form');
+            if (form && form.parentNode) {
+                form.parentNode.insertBefore(processingDiv, form.nextSibling);
+            }
+        }
+        processingDiv.style.display = 'block';
+    }
+</script>
+{% if video_url or image_url %}
+<script>
+    // Espera a que el DOM esté listo
+    document.addEventListener('DOMContentLoaded', function () {
+        var mediaCard = document.querySelector('.card.mt-4');
+        if (mediaCard) {
+            mediaCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}
