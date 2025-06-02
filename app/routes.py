@@ -1,9 +1,11 @@
 from flask import Blueprint, request, jsonify, send_from_directory, current_app, render_template, flash, redirect, url_for
 import json
 import os
+import time
 import numpy as np
 from .solvers import simplex, granm_solver, dosfases_solver
 from .solvers import SimplexError, GranMError, DosFasesError, UnboundedError, DimensionError, InfeasibleError
+from .solvers.multiple_solutions_detector import detect_multiple_solutions, format_multiple_solutions_result
 from .manim_renderer import generate_manim_animation
 import uuid
 import logging
@@ -41,126 +43,380 @@ def dosfases_page():
 @main_bp.route('/resolver/simplex', methods=['POST'])
 def resolver_simplex():
     try:
-        # Obtener datos del formulario
-        c = list(map(float, request.form['c'].split(',')))
-        A_rows = request.form['A'].strip().split('\n')
+        # Obtener datos del formulario y mantenerlos
+        form_data = {
+            'c': request.form['c'],
+            'A': request.form['A'],
+            'b': request.form['b'],
+            'minimize': request.form.get('minimize') == 'on',
+            'track_iterations': request.form.get('track_iterations') == 'on'
+        }
+        
+        c = list(map(float, form_data['c'].split(',')))
+        A_rows = form_data['A'].strip().split('\n')
         A = [list(map(float, row.split(','))) for row in A_rows]
-        b = list(map(float, request.form['b'].split(',')))
-        minimize = request.form.get('minimize') == 'on'
-        track_iterations = request.form.get('track_iterations') == 'on'
+        b = list(map(float, form_data['b'].split(',')))
+        minimize = form_data['minimize']
+        track_iterations = form_data['track_iterations']
+        
+        # Validaciones básicas de dimensiones
+        if len(A) != len(b):
+            raise ValueError("El número de filas en A y en b no coincide")
+        if any(len(row) != len(c) for row in A):
+            raise ValueError("Cada fila de A debe tener la misma cantidad de columnas que c")
         
         # Resolver
         if track_iterations:
             solution, optimal_value, tableau_history, pivot_history = simplex(
                 c, A, b, minimize=minimize, track_iterations=True
             )
+            # Convertir valores numpy a tipos nativos de Python antes de serializar
             resultado = {
-                'solution': solution.tolist() if hasattr(solution, 'tolist') else solution,
+                'solution': [float(x) for x in solution],
                 'optimal_value': float(optimal_value),
-                'tableau_history': [t.tolist() if hasattr(t, 'tolist') else t for t in tableau_history],
-                'pivot_history': pivot_history,
+                'tableau_history': [t.tolist() for t in tableau_history],
+                'pivot_history': [[int(r), int(c)] for r, c in pivot_history],
                 'success': True
-            }
+            }            # ─ Detectar soluciones múltiples óptimas con nuevo detector ─
+            final_tableau = tableau_history[-1]
+            n_vars = len(c)
+            
+            # Usar el nuevo detector mejorado
+            multiple_solutions_result = detect_multiple_solutions(final_tableau, n_vars)
+            formatted_result = format_multiple_solutions_result(multiple_solutions_result)
+            
+            # Integrar resultados al resultado principal
+            resultado.update(formatted_result)
         else:
             solution, optimal_value = simplex(c, A, b, minimize=minimize)
+            # Convertir valores numpy a tipos nativos de Python antes de serializar
             resultado = {
-                'solution': solution.tolist() if hasattr(solution, 'tolist') else solution,
+                'solution': [float(x) for x in solution],
                 'optimal_value': float(optimal_value),
                 'success': True
-            }
-        
-        return render_template('simplex.html', resultado=resultado)
+            }        
+        return render_template('simplex.html', resultado=resultado, form_data=form_data)
+    except (SimplexError, DimensionError, UnboundedError) as e:
+        flash(f'Error en el método Simplex: {str(e)}', 'danger')
+        return redirect(url_for('main.simplex_page'))
     except Exception as e:
-        flash(f'Error: {str(e)}', 'error')
+        flash(f'Error inesperado: {str(e)}', 'error')
+        return redirect(url_for('main.simplex_page'))
+
+@main_bp.route('/descargar/simplex_json', methods=['POST'])
+def descargar_simplex_json():
+    try:
+        # Obtener datos del formulario enviados desde el botón de descarga
+        resultado_json = request.form.get('resultado_json')
+        
+        if not resultado_json:
+            flash('No hay resultado para descargar', 'error')
+            return redirect(url_for('main.simplex_page'))
+        
+        # Parsear los datos del resultado
+        resultado = json.loads(resultado_json)
+        
+        # Recoger los datos del formulario directamente
+        form_data = {
+            'c': request.form.get('c', ''),
+            'A': request.form.get('A', ''),
+            'b': request.form.get('b', ''),
+            'minimize': request.form.get('minimize') == 'on',
+            'track_iterations': request.form.get('track_iterations') == 'on'
+        }
+        
+        # Crear estructura completa para el JSON
+        data_export = {
+            'metodo': 'Simplex',
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'datos_entrada': {
+                'funcion_objetivo': form_data.get('c', ''),
+                'matriz_restricciones': form_data.get('A', ''),
+                'vector_recursos': form_data.get('b', ''),
+                'minimizar': form_data.get('minimize', False),
+                'mostrar_iteraciones': form_data.get('track_iterations', False)
+            },
+            'resultado': resultado
+        }
+        
+        # Crear respuesta de descarga
+        from flask import make_response
+        response = make_response(json.dumps(data_export, indent=2, ensure_ascii=False))
+        response.headers['Content-Type'] = 'application/json'
+        response.headers['Content-Disposition'] = f'attachment; filename=simplex_resultado_{int(time.time())}.json'
+        
+        return response
+    
+    except Exception as e:
+        flash(f'Error al descargar: {str(e)}', 'error')
         return redirect(url_for('main.simplex_page'))
 
 @main_bp.route('/resolver/granm', methods=['POST'])
 def resolver_granm():
     try:
-        # Obtener datos del formulario
-        c = list(map(float, request.form['c'].split(',')))
-        A_rows = request.form['A'].strip().split('\n')
-        A = [list(map(float, row.split(','))) for row in A_rows]
-        b = list(map(float, request.form['b'].split(',')))
-        
-        eq_constraints = None
-        if request.form['eq_constraints'].strip():
-            eq_constraints = list(map(int, request.form['eq_constraints'].split(',')))
-        
-        minimize = request.form.get('minimize') == 'on'
-        track_iterations = request.form.get('track_iterations') == 'on'
-        M = float(request.form.get('M', 1000))
-        
-        # Resolver
+        # ── 1. Leer campo por campo ──────────────────────
+        c_str   = request.form['c']
+        A_str   = request.form['A']
+        b_str   = request.form['b']
+
+        eq_str  = request.form.get('eq_constraints', '')
+        ge_str  = request.form.get('ge_constraints', '')
+        min_sw  = request.form.get('minimize')           # 'on' ó None
+        iter_sw = request.form.get('track_iterations')   # 'on' ó None
+        M_str   = request.form.get('M', '1e6')
+
+        form_data = {         # para mantener los valores en el formulario
+            'c' : c_str, 'A' : A_str, 'b' : b_str,
+            'eq_constraints': eq_str,
+            'ge_constraints': ge_str,
+            'minimize': bool(min_sw),
+            'track_iterations': bool(iter_sw),
+            'M': M_str
+        }
+
+        # ── 2. Parseo de listas numéricas ───────────────
+        c = [float(x) for x in c_str.split(',') if x.strip()]
+        A = [[float(num) for num in row.split(',') if num.strip()]
+             for row in A_str.strip().split('\n') if row.strip()] # Corrected \n to 
+
+        b = [float(x) for x in b_str.split(',') if x.strip()]
+
+        # Validaciones básicas
+        if len(A) != len(b):
+            raise ValueError("El número de filas en A y en b no coincide")
+        if any(len(row) != len(c) for row in A):
+            raise ValueError("Cada fila de A debe tener la misma cantidad de columnas que c")
+
+        # ── 3. Construir vector sense ───────────────────
+        m = len(b)
+        eq_idxs = [int(i) for i in eq_str.split(',') if i.strip().isdigit()]
+        ge_idxs = [int(i) for i in ge_str.split(',') if i.strip().isdigit()]
+
+        sense = ['≤'] * m
+        for i in eq_idxs:
+            if 0 <= i < m: # Check index bounds
+                sense[i] = '='
+        for i in ge_idxs:
+            if 0 <= i < m: # Check index bounds
+                sense[i] = '≥'        # ── 4. Llamar al solver ─────────────────────────
+        minimize          = bool(min_sw)
+        track_iterations  = bool(iter_sw)
+        M_val             = float(M_str)
+
         if track_iterations:
-            solution, optimal_value, tableau_history, pivot_history = granm_solver(
-                c, A, b, eq_constraints=eq_constraints, minimize=minimize, 
-                track_iterations=True, M=M
+            sol, z, T_hist, piv_hist = granm_solver(
+                c, A, b, sense,
+                minimize=minimize, track_iterations=True, M=M_val
             )
+            # Convertir valores numpy a tipos nativos de Python antes de serializar
             resultado = {
-                'solution': solution.tolist() if hasattr(solution, 'tolist') else solution,
-                'optimal_value': float(optimal_value),
-                'tableau_history': [t.tolist() if hasattr(t, 'tolist') else t for t in tableau_history],
-                'pivot_history': pivot_history,
+                'solution': [float(x) for x in sol],
+                'optimal_value': float(z),
+                'tableau_history': [t.tolist() for t in T_hist], # Ensure inner elements are also converted
+                'pivot_history': [[int(r), int(c)] for r, c in piv_hist],
                 'success': True
-            }
+            }            # ─ Detectar y generar soluciones múltiples óptimas (Gran M) ─
+            final_tableau = T_hist[-1]
+            n_vars = len(c)
+            
+            # Usar el nuevo detector mejorado
+            multiple_solutions_result = detect_multiple_solutions(final_tableau, n_vars)
+            formatted_result = format_multiple_solutions_result(multiple_solutions_result)            
+            # Integrar resultados al resultado principal
+            resultado.update(formatted_result)
         else:
-            solution, optimal_value = granm_solver(
-                c, A, b, eq_constraints=eq_constraints, minimize=minimize, M=M
+            sol, z = granm_solver(
+                c, A, b, sense,
+                minimize=minimize, track_iterations=False, M=M_val
             )
+            # Convertir valores numpy a tipos nativos de Python antes de serializar
             resultado = {
-                'solution': solution.tolist() if hasattr(solution, 'tolist') else solution,
-                'optimal_value': float(optimal_value),
+                'solution': [float(x) for x in sol],
+                'optimal_value': float(z),
                 'success': True
             }
-        
-        return render_template('granm.html', resultado=resultado)
+
+        return render_template('granm.html',
+                               resultado=resultado,
+                               form_data=form_data)# ── 5. Manejo de errores ────────────────────────────
+    except (GranMError, DimensionError, UnboundedError) as e:
+        flash(f'Error en el método Gran M: {str(e)}', 'danger')
+        return redirect(url_for('main.granm_page'))
     except Exception as e:
-        flash(f'Error: {str(e)}', 'error')
+        flash(f'Error inesperado: {e}', 'error')
+        # Log the error for more details
+        current_app.logger.error(f"Error in resolver_granm: {e}", exc_info=True)
+        return redirect(url_for('main.granm_page'))
+
+@main_bp.route('/descargar/granm_json', methods=['POST'])
+def descargar_granm_json():
+    try:
+        # Obtener datos del formulario enviados desde el botón de descarga
+        resultado_json = request.form.get('resultado_json')
+        
+        if not resultado_json:
+            flash('No hay resultado para descargar', 'error')
+            return redirect(url_for('main.granm_page'))
+        
+        # Parsear los datos del resultado
+        resultado = json.loads(resultado_json)
+        
+        # Recoger los datos del formulario directamente
+        form_data = {
+            'c': request.form.get('c', ''),
+            'A': request.form.get('A', ''),
+            'b': request.form.get('b', ''),
+            'M': request.form.get('M', ''),
+            'minimize': request.form.get('minimize') == 'on',
+            'track_iterations': request.form.get('track_iterations') == 'on'
+        }
+        
+        # Crear estructura completa para el JSON
+        data_export = {
+            'metodo': 'Gran M',
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'datos_entrada': {
+                'funcion_objetivo': form_data.get('c', ''),
+                'matriz_restricciones': form_data.get('A', ''),
+                'vector_recursos': form_data.get('b', ''),
+                'valor_M': form_data.get('M', '1000'),
+                'minimizar': form_data.get('minimize', False),
+                'mostrar_iteraciones': form_data.get('track_iterations', False)
+            },
+            'resultado': resultado
+        }
+        
+        # Crear respuesta de descarga
+        from flask import make_response
+        response = make_response(json.dumps(data_export, indent=2, ensure_ascii=False))
+        response.headers['Content-Type'] = 'application/json'
+        response.headers['Content-Disposition'] = f'attachment; filename=granm_resultado_{int(time.time())}.json'
+        
+        return response
+    
+    except Exception as e:
+        flash(f'Error al descargar: {str(e)}', 'error')
         return redirect(url_for('main.granm_page'))
 
 @main_bp.route('/resolver/dosfases', methods=['POST'])
 def resolver_dosfases():
     try:
         # Obtener datos del formulario
-        c = list(map(float, request.form['c'].split(',')))
-        A_rows = request.form['A'].strip().split('\n')
+        form_data = {
+            'c': request.form['c'],
+            'A': request.form['A'],
+            'b': request.form['b'],
+            'eq_constraints': request.form['eq_constraints'],
+            'ge_constraints': request.form.get('ge_constraints', ''),
+            'minimize': request.form.get('minimize') == 'on',
+            'track_iterations': request.form.get('track_iterations') == 'on'
+        }
+        
+        c = list(map(float, form_data['c'].split(',')))
+        A_rows = form_data['A'].strip().split('\n')
         A = [list(map(float, row.split(','))) for row in A_rows]
-        b = list(map(float, request.form['b'].split(',')))
+        b = list(map(float, form_data['b'].split(',')))
         
         eq_constraints = None
-        if request.form['eq_constraints'].strip():
-            eq_constraints = list(map(int, request.form['eq_constraints'].split(',')))
+        if form_data['eq_constraints'].strip():
+            eq_constraints = list(map(int, form_data['eq_constraints'].split(',')))
         
-        minimize = request.form.get('minimize') == 'on'
-        track_iterations = request.form.get('track_iterations') == 'on'
+        ge_constraints = None
+        if form_data['ge_constraints'].strip():
+            ge_constraints = list(map(int, form_data['ge_constraints'].split(',')))
+        
+        minimize = form_data['minimize']
+        track_iterations = form_data['track_iterations']
         
         # Resolver
         if track_iterations:
             solution, optimal_value, tableau_history, pivot_history = dosfases_solver(
-                c, A, b, eq_constraints=eq_constraints, minimize=minimize, 
-                track_iterations=True
+                c, A, b, eq_constraints=eq_constraints, ge_constraints=ge_constraints, 
+                minimize=minimize, track_iterations=True
             )
+            # Convertir valores numpy a tipos nativos de Python antes de serializar
             resultado = {
-                'solution': solution.tolist() if hasattr(solution, 'tolist') else solution,
-                'optimal_value': float(optimal_value),
-                'tableau_history': [t.tolist() if hasattr(t, 'tolist') else t for t in tableau_history],
-                'pivot_history': pivot_history,
+                'solution': convert_numpy_types(solution),
+                'optimal_value': convert_numpy_types(optimal_value),
+                'tableau_history': convert_numpy_types(tableau_history),
+                'pivot_history': convert_numpy_types(pivot_history),
                 'success': True
-            }
+            }            # ─ Detectar y generar soluciones múltiples óptimas (Dos Fases) ─
+            final_tableau = tableau_history[-1]
+            n_vars = len(c)
+            
+            # Usar el nuevo detector mejorado
+            multiple_solutions_result = detect_multiple_solutions(final_tableau, n_vars)
+            formatted_result = format_multiple_solutions_result(multiple_solutions_result)            
+            # Integrar resultados al resultado principal
+            resultado.update(formatted_result)
         else:
             solution, optimal_value = dosfases_solver(
-                c, A, b, eq_constraints=eq_constraints, minimize=minimize
+                c, A, b, eq_constraints=eq_constraints, ge_constraints=ge_constraints, 
+                minimize=minimize
             )
+            # Convertir valores numpy a tipos nativos de Python antes de serializar
             resultado = {
-                'solution': solution.tolist() if hasattr(solution, 'tolist') else solution,
-                'optimal_value': float(optimal_value),
+                'solution': convert_numpy_types(solution),
+                'optimal_value': convert_numpy_types(optimal_value),
                 'success': True
             }
-        
-        return render_template('dosfases.html', resultado=resultado)
+        return render_template('dosfases.html', resultado=resultado, form_data=form_data)
+    except (DosFasesError, DimensionError, UnboundedError, InfeasibleError) as e:
+        flash(f'Error en el método Dos Fases: {str(e)}', 'danger')
+        return redirect(url_for('main.dosfases_page'))
     except Exception as e:
-        flash(f'Error: {str(e)}', 'error')
+        flash(f'Error inesperado: {str(e)}', 'error')
+        return redirect(url_for('main.dosfases_page'))
+
+@main_bp.route('/descargar/dosfases_json', methods=['POST'])
+def descargar_dosfases_json():
+    try:
+        # Obtener datos del formulario enviados desde el botón de descarga
+        resultado_json = request.form.get('resultado_json')
+        
+        if not resultado_json:
+            flash('No hay resultado para descargar', 'error')
+            return redirect(url_for('main.dosfases_page'))
+        
+        # Parsear los datos del resultado
+        resultado = json.loads(resultado_json)
+        
+        # Recoger los datos del formulario directamente
+        form_data = {
+            'c': request.form.get('c', ''),
+            'A': request.form.get('A', ''),
+            'b': request.form.get('b', ''),
+            'eq_constraints': request.form.get('eq_constraints', ''),
+            'minimize': request.form.get('minimize') == 'on',
+            'track_iterations': request.form.get('track_iterations') == 'on'
+        }
+        
+        # Crear estructura completa para el JSON
+        data_export = {
+            'metodo': 'Dos Fases',
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'datos_entrada': {
+                'funcion_objetivo': form_data.get('c', ''),
+                'matriz_restricciones': form_data.get('A', ''),
+                'vector_recursos': form_data.get('b', ''),
+                'restricciones_igualdad': form_data.get('eq_constraints', ''),
+                'minimizar': form_data.get('minimize', False),
+                'mostrar_iteraciones': form_data.get('track_iterations', False)
+            },
+            'resultado': resultado
+        }
+        
+        # Crear respuesta de descarga
+        from flask import make_response
+        response = make_response(json.dumps(data_export, indent=2, ensure_ascii=False))
+        response.headers['Content-Type'] = 'application/json'
+        response.headers['Content-Disposition'] = f'attachment; filename=dosfases_resultado_{int(time.time())}.json'
+        
+        return response
+    
+    except Exception as e:
+        flash(f'Error al descargar: {str(e)}', 'error')
         return redirect(url_for('main.dosfases_page'))
 
 # ===== RUTAS API EXISTENTES =====
@@ -202,6 +458,7 @@ def favicon():
 
 @main_bp.route('/generar-animacion/simplex', methods=['POST'])
 def generar_animacion_simplex():
+    start_time = time.time()
     logger.info("Ruta generar_animacion_simplex iniciada")
     try:
         # Obtener datos del formulario
@@ -274,29 +531,35 @@ def generar_animacion_simplex():
             static_media_path = os.path.join(media_dir, f'{media_id}{file_extension}')
             shutil.copy2(media_path, static_media_path)
             logger.info(f"Archivo copiado a: {static_media_path}")
-            
             media_url = f'/static/media/{media_id}{file_extension}'
             logger.info(f"URL de media: {media_url}")
             
             if is_video:
                 flash('¡Animación de video generada exitosamente!', 'success')
                 logger.info("Renderizando template con video")
+                elapsed_time = time.time() - start_time
+                logger.info(f"Proceso completado en {elapsed_time:.2f} segundos")
                 return render_template('simplex.html', 
                                      solution=result, 
                                      video_url=media_url)
             else:
                 flash('¡Visualización generada exitosamente!', 'success')
                 logger.info("Renderizando template con imagen")
+                elapsed_time = time.time() - start_time
+                logger.info(f"Proceso completado en {elapsed_time:.2f} segundos")
                 return render_template('simplex.html', 
                                      solution=result, 
                                      image_url=media_url)
         else:
             logger.warning(f"Archivo no encontrado o path vacío: {media_path}")
             flash('Error al generar la animación. Mostrando solo resultados.', 'warning')
+            elapsed_time = time.time() - start_time
+            logger.info(f"Proceso (con advertencia) completado en {elapsed_time:.2f} segundos")
             return render_template('simplex.html', solution=result)
             
     except Exception as e:
-        logger.error(f"Error generating Simplex animation: {e}")
+        elapsed_time = time.time() - start_time
+        logger.error(f"Error generating Simplex animation after {elapsed_time:.2f} segundos: {e}")
         flash(f'Error al generar la animación: {str(e)}', 'danger')
         return redirect(url_for('main.simplex_page'))
 
@@ -356,20 +619,27 @@ def generar_animacion_granm():
 @main_bp.route('/generar-animacion/dosfases', methods=['POST'])
 def generar_animacion_dosfases():
     try:
-        # Obtener datos del formulario
-        c = list(map(float, request.form['c'].split(',')))
-        A_rows = request.form['A'].strip().split('\n')
+        # Obtener datos del formulario y mantenerlos
+        form_data = {
+            'c': request.form['c'],
+            'A': request.form['A'],
+            'b': request.form['b'],
+            'eq_constraints': request.form.get('eq_constraints', ''),
+            'minimize': request.form.get('minimize') == 'on',
+            'track_iterations': request.form.get('track_iterations') == 'on'
+        }
+        
+        c = list(map(float, form_data['c'].split(',')))
+        A_rows = form_data['A'].strip().split('\n')
         A = [list(map(float, row.split(','))) for row in A_rows]
-        b = list(map(float, request.form['b'].split(',')))
-        minimize = request.form.get('minimize') == 'on'
+        b = list(map(float, form_data['b'].split(',')))
+        minimize = form_data['minimize']
         
-        eq_constraints_str = request.form.get('eq_constraints', '').strip()
         eq_constraints = []
-        if eq_constraints_str:
-            eq_constraints = list(map(int, eq_constraints_str.split(',')))
-        
-        # Resolver el problema
-        result = dosfases_solver(c, A, b, eq_constraints=eq_constraints, minimize=minimize)
+        if form_data['eq_constraints'].strip():
+            eq_constraints = list(map(int, form_data['eq_constraints'].split(',')))
+          # Resolver el problema
+        result = dosfases_solver(c, A, b, eq_constraints=eq_constraints, ge_constraints=[], minimize=minimize)
         
         if 'error' in result:
             flash(f'Error al resolver el problema: {result["error"]}', 'danger')
@@ -396,10 +666,11 @@ def generar_animacion_dosfases():
             flash('¡Animación generada exitosamente!', 'success')
             return render_template('dosfases.html', 
                                  solution=result, 
-                                 video_url=f'/static/videos/{video_id}.mp4')
+                                 video_url=f'/static/videos/{video_id}.mp4',
+                                 form_data=form_data)
         else:
             flash('Error al generar la animación. Mostrando solo resultados.', 'warning')
-            return render_template('dosfases.html', solution=result)
+            return render_template('dosfases.html', solution=result, form_data=form_data)
             
     except Exception as e:
         logger.error(f"Error generating Dos Fases animation: {e}")
@@ -460,8 +731,7 @@ def resolver_simplex():
         # Validate inputs
         if not c or not A or not b:
             return jsonify({"error": "Datos incompletos. Se requieren c, A y b."}), 400
-        
-        # Solve with Simplex
+          # Solve with Simplex
         if track_iterations:
             solution, z_opt, tableau_history, pivot_history = simplex(
                 c, A, b, minimize=minimize, track_iterations=True
@@ -472,6 +742,26 @@ def resolver_simplex():
                 "tableau_history": [t.tolist() for t in tableau_history] if hasattr(tableau_history[0], "tolist") else tableau_history,
                 "pivot_history": pivot_history
             }
+            
+            # ─ Detectar múltiples soluciones usando el detector mejorado ─
+            try:
+                final_tableau = tableau_history[-1]
+                multiple_solutions_result = detect_multiple_solutions(
+                    final_tableau, len(c), c, minimize=minimize
+                )
+                
+                # Formatear resultado para compatibilidad con API
+                result['multiple_solutions'] = format_multiple_solutions_result(multiple_solutions_result)
+                
+                # Mantener compatibilidad con API anterior
+                result['has_multiple_solutions'] = multiple_solutions_result['has_multiple_solutions']
+                result['multiple_solution_vars'] = multiple_solutions_result.get('variables_with_zero_cost', [])
+                if multiple_solutions_result.get('alternative_solutions'):
+                    result['alternative_solutions'] = multiple_solutions_result['alternative_solutions']
+                
+            except Exception as e:
+                logger.warning(f"Error en detección de múltiples soluciones: {e}")
+                result['multiple_solutions'] = {'has_multiple_solutions': False, 'error': str(e)}
         else:
             solution, z_opt = simplex(
                 c, A, b, minimize=minimize, track_iterations=False
@@ -499,12 +789,12 @@ def resolver_granm():
         eq_constraints = data.get('eq_constraints', [])
         minimize = data.get('minimize', False)
         track_iterations = data.get('track_iterations', False)
-        
+
         # Validate inputs
         if not c or not A or not b:
             return jsonify({"error": "Datos incompletos. Se requieren c, A y b."}), 400
-        
-        # Solve with Gran M
+
+        # Resolver con iteraciones
         if track_iterations:
             solution, z_opt, tableau_history, pivot_history = granm_solver(
                 c, A, b, eq_constraints, minimize, track_iterations=True
@@ -515,6 +805,27 @@ def resolver_granm():
                 "tableau_history": [t.tolist() for t in tableau_history] if hasattr(tableau_history[0], "tolist") else tableau_history,
                 "pivot_history": pivot_history
             }
+
+            # ─ Detectar múltiples soluciones usando el detector mejorado ─
+            try:
+                final_tableau = tableau_history[-1]
+                multiple_solutions_result = detect_multiple_solutions(
+                    final_tableau, len(c), c, minimize=minimize
+                )
+
+                # Formatear resultado
+                result['multiple_solutions'] = format_multiple_solutions_result(multiple_solutions_result)
+                result['has_multiple_solutions'] = multiple_solutions_result['has_multiple_solutions']
+                result['multiple_solution_vars'] = multiple_solutions_result.get('variables_with_zero_cost', [])
+
+                if multiple_solutions_result.get('alternative_solutions'):
+                    result['alternative_solutions'] = multiple_solutions_result['alternative_solutions']
+
+            except Exception as e:
+                logger.warning(f"Error en detección de múltiples soluciones: {e}")
+                result['multiple_solutions'] = {'has_multiple_solutions': False, 'error': str(e)}
+
+        # Resolver sin iteraciones
         else:
             solution, z_opt = granm_solver(
                 c, A, b, eq_constraints, minimize, track_iterations=False
@@ -523,13 +834,45 @@ def resolver_granm():
                 "solution": solution.tolist() if hasattr(solution, "tolist") else solution,
                 "optimal_value": float(z_opt)
             }
-        
+
         return jsonify(result)
+
     except (GranMError, DimensionError, UnboundedError) as e:
         return jsonify({"error": str(e)}), 400
+
     except Exception as e:
         logger.exception("Error in Gran M solver")
         return jsonify({"error": f"Error inesperado: {str(e)}"}), 500
+
+# Helper function to convert NumPy types to native Python types
+def convert_numpy_types(obj):
+    """Convert numpy types to native Python types for JSON serialization"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Handle numpy scalars
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    # Handle Python built-in types with nested numpy
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(convert_numpy_types(item) for item in obj)
+    # Check if it's any numpy type we missed
+    elif hasattr(obj, 'dtype') and 'numpy' in str(type(obj)):
+        if obj.ndim == 0:  # scalar
+            return obj.item()
+        else:
+            return obj.tolist()
+    return obj
 
 # Solve using Two-Phase method
 @api_bp.route('/resolver/dosfases', methods=['POST'])
@@ -540,6 +883,7 @@ def resolver_dosfases():
         A = data.get('A', [[]])
         b = data.get('b', [])
         eq_constraints = data.get('eq_constraints', [])
+        ge_constraints = data.get('ge_constraints', [])
         minimize = data.get('minimize', False)
         track_iterations = data.get('track_iterations', False)
         
@@ -550,21 +894,98 @@ def resolver_dosfases():
         # Solve with Two-Phase method
         if track_iterations:
             solution, z_opt, tableau_history, pivot_history = dosfases_solver(
-                c, A, b, eq_constraints, minimize, track_iterations=True
+                c, A, b, eq_constraints=eq_constraints, ge_constraints=ge_constraints, 
+                minimize=minimize, track_iterations=True
             )
             result = {
-                "solution": solution.tolist() if hasattr(solution, "tolist") else solution,
-                "optimal_value": float(z_opt),
-                "tableau_history": [t.tolist() for t in tableau_history] if hasattr(tableau_history[0], "tolist") else tableau_history,
-                "pivot_history": pivot_history
+                "solution": convert_numpy_types(solution),
+                "optimal_value": convert_numpy_types(z_opt),
+                "tableau_history": convert_numpy_types(tableau_history),
+                "pivot_history": convert_numpy_types(pivot_history)
             }
+            
+            # ─ Detectar y generar soluciones múltiples óptimas (Dos Fases - API) ─
+            final_tableau = tableau_history[-1]
+            z_row = final_tableau[0, :-1]
+            n_vars = len(c)
+
+            non_basic_zero_cost = []
+            for j in range(n_vars):  # Solo variables originales
+                col = final_tableau[1:, j]
+                if np.count_nonzero(col) != 1 or not np.isclose(col.max(), 1.0):
+                    # Está fuera de la base
+                    if abs(z_row[j]) < 1e-8:  # costo reducido ≈ 0
+                        non_basic_zero_cost.append(j)
+
+            result['has_multiple_solutions'] = bool(non_basic_zero_cost)
+            result['multiple_solution_vars'] = convert_numpy_types(non_basic_zero_cost)
+
+            # Generar soluciones alternativas si existen
+            alternative_solutions = []
+            if non_basic_zero_cost:
+                for var_to_enter in non_basic_zero_cost:
+                    try:
+                        # Crear una copia del tableau final para pivotear
+                        tableau_copy = final_tableau.copy()
+                        
+                        # Encontrar la fila pivote (ratio test)
+                        entering_col = tableau_copy[1:, var_to_enter]
+                        rhs_col = tableau_copy[1:, -1]
+                        
+                        # Solo considerar ratios positivos
+                        valid_ratios = []
+                        for i, (col_val, rhs_val) in enumerate(zip(entering_col, rhs_col)):
+                            if col_val > 1e-8:  # Evitar división por cero/negativo
+                                valid_ratios.append((rhs_val / col_val, i + 1))  # i+1 porque saltamos la fila z
+                        
+                        if valid_ratios:
+                            # Encontrar el mínimo ratio (regla del pivote)
+                            min_ratio, pivot_row = min(valid_ratios)
+                            
+                            # Realizar el pivoteo
+                            pivot_element = tableau_copy[pivot_row, var_to_enter]
+                            
+                            # Normalizar la fila pivote
+                            tableau_copy[pivot_row, :] /= pivot_element
+                            
+                            # Eliminar la columna pivote en otras filas
+                            for i in range(tableau_copy.shape[0]):
+                                if i != pivot_row:
+                                    factor = tableau_copy[i, var_to_enter]
+                                    tableau_copy[i, :] -= factor * tableau_copy[pivot_row, :]
+                            
+                            # Extraer la nueva solución
+                            new_solution = np.zeros(n_vars)
+                            
+                            # Identificar variables básicas en el nuevo tableau
+                            for j in range(n_vars):
+                                col = tableau_copy[1:, j]
+                                # Si es una columna unitaria (variable básica)
+                                if np.count_nonzero(col) == 1 and np.isclose(col.max(), 1.0):
+                                    basic_row = np.where(np.isclose(col, 1.0))[0][0] + 1
+                                    new_solution[j] = tableau_copy[basic_row, -1]
+                              # Verificar que la solución es válida (no negativa)
+                            if np.all(new_solution >= -1e-8):  # Tolerancia para errores numéricos
+                                new_solution = np.maximum(new_solution, 0)  # Limpiar valores muy pequeños negativos
+                                alternative_solutions.append({
+                                    'solution': convert_numpy_types(new_solution),
+                                    'entering_var': convert_numpy_types(var_to_enter),
+                                    'pivot_row': convert_numpy_types(pivot_row - 1)  # Ajustar índice
+                                })
+                        
+                    except Exception as e:
+                        # Si hay error al generar esta solución alternativa, continuar con la siguiente
+                        logger.warning(f"Error generando solución alternativa para variable {var_to_enter}: {e}")
+                        continue            
+            result['alternative_solutions'] = alternative_solutions
         else:
             solution, z_opt = dosfases_solver(
-                c, A, b, eq_constraints, minimize, track_iterations=False
+                c, A, b, eq_constraints=eq_constraints, ge_constraints=ge_constraints, 
+                minimize=minimize, track_iterations=False
             )
             result = {
-                "solution": solution.tolist() if hasattr(solution, "tolist") else solution,
-                "optimal_value": float(z_opt)
+                "solution": convert_numpy_types(solution),
+                "optimal_value": convert_numpy_types(z_opt)
             }
         
         return jsonify(result)

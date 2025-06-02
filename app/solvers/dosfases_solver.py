@@ -1,5 +1,6 @@
 import numpy as np
 
+# Exception classes for Two-Phase method
 class DosFasesError(Exception):
     """Base exception for Two-Phase method errors."""
     pass
@@ -16,262 +17,343 @@ class InfeasibleError(DosFasesError):
     """Exception raised when problem is infeasible."""
     pass
 
-def dosfases_solver(c, A, b, eq_constraints=None, minimize=False, track_iterations=False):
+def dosfases_solver(c, A, b, eq_constraints=None, ge_constraints=None, minimize=False, track_iterations=False):
     """
-    Implements the Two-Phase method to solve linear programming problems with equality and/or inequality constraints.
+    Solves linear programming problems using the Two-Phase Method.
     
     Args:
-        c (list): Coefficients of the objective function.
-        A (list of lists): Matrix of constraint coefficients.
-        b (list): Right-hand side values of constraints.
-        eq_constraints (list): Indices of equality constraints (0-based).
-        minimize (bool): If True, minimize the objective function; otherwise, maximize.
-        track_iterations (bool): If True, return tableau history and pivot history.
+        c: Objective function coefficients
+        A: Constraint matrix  
+        b: Right-hand side values
+        eq_constraints: List of indices for equality constraints
+        ge_constraints: List of indices for >= constraints
+        minimize: Whether to minimize (True) or maximize (False)
+        track_iterations: Whether to track tableau iterations
     
     Returns:
-        If track_iterations is False:
-            tuple: (solution, optimal value)
-        If track_iterations is True:
-            tuple: (solution, optimal value, tableau_history, pivot_history)
-    
-    Raises:
-        DimensionError: If dimensions of input arrays are incompatible.
-        UnboundedError: If problem is unbounded.
-        InfeasibleError: If problem is infeasible.
+        If track_iterations=False:
+            tuple: (solution, optimal_value)
+        If track_iterations=True:
+            tuple: (solution, optimal_value, tableau_history, pivot_history)
     """
-    # Convert inputs to numpy arrays
     c = np.array(c, dtype=float)
     A = np.array(A, dtype=float)
     b = np.array(b, dtype=float)
     
-    # Verify dimensions
-    n_vars = len(c)
-    n_constraints = len(b)
+    if minimize:
+        c = -c
     
-    if A.shape != (n_constraints, n_vars):
-        raise DimensionError(f"Dimensions mismatch: A is {A.shape}, expected ({n_constraints}, {n_vars})")
-
-    # Handle negative b values by multiplying the constraint by -1
-    for i in range(n_constraints):
-        if b[i] < 0:
-            A[i, :] = -A[i, :]
-            b[i] = -b[i]
+    m, n = A.shape
     
-    # By default, all constraints are inequalities
+    # Initialize tracking lists if needed
+    tableau_history = [] if track_iterations else None
+    pivot_history = [] if track_iterations else None
+    
+    # Initialize constraint types
     if eq_constraints is None:
         eq_constraints = []
+    if ge_constraints is None:
+        ge_constraints = []
     
-    # If minimizing, convert to maximization problem
-    if minimize:
-        c_original = -c
-    else:
-        c_original = c.copy()
+    # Convert constraints to standard form
+    A_std = A.copy()
+    b_std = b.copy()
     
-    # History tracking setup
-    if track_iterations:
-        all_tableau_history = []
-        all_pivot_history = []
+    # Convert >= constraints to <= by multiplying by -1
+    for i in ge_constraints:
+        if i < m:
+            A_std[i] = -A_std[i]
+            b_std[i] = -b_std[i]
     
-    # PHASE 1: Find a basic feasible solution
-    # Count number of artificial variables needed
-    n_artificial = len(eq_constraints) + np.sum(b < 0)
+    # Add slack variables for <= constraints
+    slack_matrix = np.eye(m)
+    A_with_slack = np.hstack([A_std, slack_matrix])
     
-    # Prepare Phase 1 tableau
-    # Columns: original variables | slack variables | artificial variables | RHS
-    total_vars_phase1 = n_vars + n_constraints + n_artificial
-    tableau1 = np.zeros((n_constraints + 1, total_vars_phase1 + 1))
+    # Determine which constraints need artificial variables
+    artificial_needed = []
+    
+    # All equality constraints need artificial variables
+    for i in eq_constraints:
+        if i < m:
+            artificial_needed.append(i)
+    
+    # Converted >= constraints (now <=) need artificial variables
+    for i in ge_constraints:
+        if i < m:
+            artificial_needed.append(i)
+    
+    if not artificial_needed:
+        # No artificial variables needed - can solve directly
+        solution, optimal_value, phase_tableau_history, phase_pivot_history = solve_standard_form(
+            c, A_with_slack, b_std, minimize, track_iterations
+        )
+        if track_iterations and solution is not None:
+            tableau_history.extend(phase_tableau_history)
+            pivot_history.extend(phase_pivot_history)
+        
+        if track_iterations:
+            return solution, optimal_value, tableau_history, pivot_history
+        return solution, optimal_value
+    
+    # Phase 1: Add artificial variables
+    num_artificial = len(artificial_needed)
+    artificial_matrix = np.zeros((m, num_artificial))
+    
+    for idx, constraint_idx in enumerate(artificial_needed):
+        artificial_matrix[constraint_idx, idx] = 1
+    
+    A_phase1 = np.hstack([A_with_slack, artificial_matrix])
     
     # Phase 1 objective: minimize sum of artificial variables
-    tableau1[0, n_vars + n_constraints:total_vars_phase1] = -1
+    c_phase1 = np.zeros(A_phase1.shape[1])
+    for i in range(num_artificial):
+        c_phase1[n + m + i] = 1  # Coefficients for artificial variables
     
-    # Set the constraint coefficients and slack variables
-    slack_var_index = n_vars
-    artificial_var_index = n_vars + n_constraints
-    artificial_vars_added = 0
+    # Create Phase 1 tableau
+    tableau1 = create_tableau(c_phase1, A_phase1, b_std, maximize=False)
     
-    for i in range(n_constraints):
-        # Add constraint coefficients
-        tableau1[i + 1, :n_vars] = A[i, :]
-        
-        # Add slack variable for this constraint if it's an inequality
-        if i not in eq_constraints:
-            tableau1[i + 1, slack_var_index] = 1
-            slack_var_index += 1
-        
-        # Add artificial variable for equality constraints or negative b values
-        if i in eq_constraints:
-            tableau1[i + 1, artificial_var_index] = 1
-            # Add contribution to the objective function
-            tableau1[0, :] -= tableau1[i + 1, :]
-            artificial_var_index += 1
-            artificial_vars_added += 1
-        
-        # Set the right-hand side
-        tableau1[i + 1, -1] = b[i]
+    # Initial basic variables are artificial variables
+    basic_vars = [n + m + i for i in range(num_artificial)]
     
-    # Phase 1 iterations
-    phase1_history = []
-    phase1_pivots = []
+    # Make artificial variables basic in objective function
+    for i, basic_var in enumerate(basic_vars):
+        constraint_row = artificial_needed[i]
+        # Subtract constraint row from objective to make coefficient 0
+        tableau1[-1] -= tableau1[constraint_row]
     
-    # Main simplex loop for Phase 1
-    max_iterations = 100  # Prevent infinite loops
-    for iteration in range(max_iterations):
-        if track_iterations:
-            phase1_history.append(tableau1.copy())
-        
-        # Find the pivot column (most negative in objective row)
-        pivot_col = np.argmin(tableau1[0, :-1])
-        if tableau1[0, pivot_col] >= -1e-10:  # Use small threshold for numerical stability
-            # Phase 1 optimal solution found
-            break
-        
-        # Find the pivot row (smallest ratio of b/a)
-        column = tableau1[1:, pivot_col]
-        if np.all(column <= 0):
-            raise UnboundedError("Phase 1 problem is unbounded (this shouldn't happen)")
-        
-        # Calculate ratios for positive entries in the pivot column
-        ratios = []
-        for i in range(n_constraints):
-            if tableau1[i + 1, pivot_col] > 0:
-                ratio = tableau1[i + 1, -1] / tableau1[i + 1, pivot_col]
-                ratios.append((i, ratio))
-            else:
-                ratios.append((i, float('inf')))
-        
-        # Find the row with minimum ratio
-        pivot_row = min(ratios, key=lambda x: x[1])[0] + 1
-        
-        if track_iterations:
-            phase1_pivots.append((pivot_row, pivot_col))
-        
-        # Pivot element
-        pivot_element = tableau1[pivot_row, pivot_col]
-        
-        # Normalize pivot row
-        tableau1[pivot_row, :] = tableau1[pivot_row, :] / pivot_element
-        
-        # Eliminate pivot column from other rows
-        for i in range(tableau1.shape[0]):
-            if i != pivot_row:
-                tableau1[i, :] -= tableau1[i, pivot_col] * tableau1[pivot_row, :]
-    
-    # Check if Phase 1 found a feasible solution
-    if tableau1[0, -1] < -1e-10:
-        raise InfeasibleError("Problem is infeasible (no basic feasible solution exists)")
-    
-    # Add Phase 1 history to overall history
     if track_iterations:
-        all_tableau_history.extend(phase1_history)
-        all_pivot_history.extend(phase1_pivots)
+        tableau_history.append(tableau1.copy())
     
-    # PHASE 2: Optimize the original objective function
-    # Prepare Phase 2 tableau by removing artificial variables and setting original objective
-    # Columns: original variables | slack variables | RHS
-    total_vars_phase2 = n_vars + n_constraints - n_artificial
-    tableau2 = np.zeros((n_constraints + 1, total_vars_phase2 + 1))
+    # Solve Phase 1
+    solution1, optimal_value1, phase1_tableau_history, phase1_pivot_history = solve_tableau(
+        tableau1, basic_vars, track_iterations
+    )
     
-    # Copy the feasible solution part without artificial variables
-    tableau2[1:, :total_vars_phase2] = tableau1[1:, :total_vars_phase2]
-    tableau2[1:, -1] = tableau1[1:, -1]
+    if track_iterations and solution1 is not None:
+        tableau_history.extend(phase1_tableau_history)
+        pivot_history.extend(phase1_pivot_history)
     
-    # Set the original objective function
-    tableau2[0, :n_vars] = -c_original
+    if solution1 is None or optimal_value1 > 1e-8:
+        if track_iterations:
+            return None, None, tableau_history, pivot_history
+        return None, None  # Infeasible
     
-    # Adjust the objective function based on basic variables
-    for j in range(n_vars):
-        col = tableau2[1:, j]
-        basic_var = False
-        basic_row = -1
-        
-        # Check if this is a basic variable
-        for i in range(n_constraints):
-            if abs(col[i] - 1.0) < 1e-10 and np.count_nonzero(col) == 1:
-                basic_var = True
-                basic_row = i
+    # Check if artificial variables are zero
+    artificial_sum = sum(solution1[n + m + i] for i in range(num_artificial))
+    if artificial_sum > 1e-8:
+        if track_iterations:
+            return None, None, tableau_history, pivot_history
+        return None, None  # Infeasible
+    
+    # Phase 2: Remove artificial variables and solve original problem
+    A_phase2 = A_phase1[:, :n + m]  # Remove artificial variable columns
+    
+    # Update basic variables (remove artificial variables)
+    basic_vars_phase2 = []
+    for i, var in enumerate(basic_vars):
+        if var < n + m:  # Keep only non-artificial basic variables
+            basic_vars_phase2.append(var)
+        else:
+            # Find a suitable non-basic variable to make basic
+            for j in range(n + m):
+                if j not in basic_vars_phase2:
+                    basic_vars_phase2.append(j)
+                    break
+    
+    # Ensure we have m basic variables
+    while len(basic_vars_phase2) < m:
+        for j in range(n + m):
+            if j not in basic_vars_phase2:
+                basic_vars_phase2.append(j)
                 break
-        
-        if basic_var:
-            # Adjust objective row for this basic variable
-            tableau2[0, :] -= tableau2[0, j] * tableau2[basic_row + 1, :]
     
-    # Phase 2 iterations
-    phase2_history = []
-    phase2_pivots = []
+    basic_vars_phase2 = basic_vars_phase2[:m]  # Take only m variables
     
-    # Main simplex loop for Phase 2
-    for iteration in range(max_iterations):
-        if track_iterations:
-            phase2_history.append(tableau2.copy())
-        
-        # Find the pivot column (most negative in objective row)
-        pivot_col = np.argmin(tableau2[0, :-1])
-        if tableau2[0, pivot_col] >= -1e-10:  # Use small threshold for numerical stability
-            # Phase 2 optimal solution found
-            break
-        
-        # Find the pivot row (smallest ratio of b/a)
-        column = tableau2[1:, pivot_col]
-        if np.all(column <= 0):
-            raise UnboundedError("Problem is unbounded")
-        
-        # Calculate ratios for positive entries in the pivot column
-        ratios = []
-        for i in range(n_constraints):
-            if tableau2[i + 1, pivot_col] > 0:
-                ratio = tableau2[i + 1, -1] / tableau2[i + 1, pivot_col]
-                ratios.append((i, ratio))
-            else:
-                ratios.append((i, float('inf')))
-        
-        # Find the row with minimum ratio
-        pivot_row = min(ratios, key=lambda x: x[1])[0] + 1
-        
-        if track_iterations:
-            phase2_pivots.append((pivot_row, pivot_col))
-        
-        # Pivot element
-        pivot_element = tableau2[pivot_row, pivot_col]
-        
-        # Normalize pivot row
-        tableau2[pivot_row, :] = tableau2[pivot_row, :] / pivot_element
-        
-        # Eliminate pivot column from other rows
-        for i in range(tableau2.shape[0]):
-            if i != pivot_row:
-                tableau2[i, :] -= tableau2[i, pivot_col] * tableau2[pivot_row, :]
+    # Create Phase 2 tableau with original objective
+    c_phase2 = np.zeros(n + m)
+    c_phase2[:n] = c
     
-    # Add Phase 2 history to overall history
+    tableau2 = create_tableau(c_phase2, A_phase2, b_std, maximize=True)
+    
+    # Make basic variables have zero coefficients in objective
+    for i, basic_var in enumerate(basic_vars_phase2):
+        if i < m and basic_var < tableau2.shape[1] - 1:
+            if abs(tableau2[-1, basic_var]) > 1e-8:
+                # Find pivot row for this basic variable
+                for row in range(m):
+                    if abs(tableau2[row, basic_var] - 1.0) < 1e-8:
+                        tableau2[-1] -= tableau2[-1, basic_var] * tableau2[row]
+                        break
+    
     if track_iterations:
-        all_tableau_history.extend(phase2_history)
-        all_pivot_history.extend(phase2_pivots)
+        tableau_history.append(tableau2.copy())
     
-    # Extract solution
-    # Initialize solution vector with zeros
-    solution = np.zeros(n_vars)
+    # Solve Phase 2
+    solution2, optimal_value2, phase2_tableau_history, phase2_pivot_history = solve_tableau(
+        tableau2, basic_vars_phase2, track_iterations
+    )
     
-    # For each original variable, check if it's a basic variable
-    for j in range(n_vars):
-        # Look for a column with exactly one 1 and all other elements 0
-        col = tableau2[1:, j]
-        # Count number of non-zeros
-        non_zeros = np.count_nonzero(col)
-        
-        if non_zeros == 1:
-            # Find the row with the non-zero element
-            row = np.where(col != 0)[0][0]
-            if abs(col[row] - 1.0) < 1e-10:  # Check if it's approximately 1
-                # This is a basic variable; its value is in the RHS
-                solution[j] = tableau2[row + 1, -1]
+    if track_iterations and solution2 is not None:
+        tableau_history.extend(phase2_tableau_history)
+        pivot_history.extend(phase2_pivot_history)
     
-    # Compute optimal value
-    z_opt = tableau2[0, -1]
+    if solution2 is None:
+        if track_iterations:
+            return None, None, tableau_history, pivot_history
+        return None, None
     
-    # If minimizing, negate the optimal value back
+    # Extract original variables
+    x = solution2[:n]
+    final_value = optimal_value2
+    
     if minimize:
-        z_opt = -z_opt
+        final_value = -final_value
     
     if track_iterations:
-        return solution, z_opt, all_tableau_history, all_pivot_history
+        return x, final_value, tableau_history, pivot_history
+    return x, final_value
+
+
+def solve_standard_form(c, A, b, minimize=False, track_iterations=False):
+    """Solve LP in standard form without artificial variables."""
+    # c is the original objective function coefficients (possibly negated if original problem was MIN)
+    # A is A_with_slack (original variables + slack variables)
+    
+    n_orig = len(c)  # Number of original variables
+    n_total_vars_in_A = A.shape[1] # Total columns in A_with_slack (original + slack)
+
+    # Create the full objective vector for the tableau, including zeros for slack variables
+    c_tableau = np.zeros(n_total_vars_in_A)
+    c_tableau[:n_orig] = c
+    
+    # When calling create_tableau:
+    # If original problem is MAX (minimize=False), then c_tableau is c_orig_padded, and maximize=True for create_tableau.
+    #   create_tableau will use -c_tableau in the objective row.
+    # If original problem is MIN (minimize=True), then c_tableau is -c_orig_padded, and maximize=False for create_tableau.
+    #   create_tableau will use c_tableau (which is already -c_orig_padded) in the objective row.
+    # This ensures the objective row is correctly set for maximization form of simplex.
+    tableau = create_tableau(c_tableau, A, b, maximize=not minimize)
+    
+    m, n_total_tableau_cols = tableau.shape # n_total_tableau_cols includes RHS
+    
+    # Initial basic variables (slack variables)
+    basic_vars = list(range(n_orig, n_total_vars_in_A))
+    
+    # Solve the tableau
+    solution, optimal_value, tableau_history, pivot_history = solve_tableau(
+        tableau, basic_vars, track_iterations
+    )
+    
+    if solution is None:
+        if track_iterations:
+            return None, None, [], []
+        return None, None
+    
+    # Extract just the original variables from solution
+    x = solution[:n_orig]
+    
+    if track_iterations:
+        return x, optimal_value, tableau_history, pivot_history
+    return x, optimal_value
+
+
+def create_tableau(c, A, b, maximize=True):
+    """Create simplex tableau."""
+    m, n = A.shape
+    tableau = np.zeros((m + 1, n + 1))
+    
+    # Constraint rows
+    tableau[:-1, :-1] = A
+    tableau[:-1, -1] = b
+    
+    # Objective row
+    if maximize:
+        tableau[-1, :-1] = -c  # Negative for maximization
     else:
-        return solution, z_opt
+        tableau[-1, :-1] = c
+    
+    return tableau
+
+
+def solve_tableau(tableau, basic_vars, track_iterations=False):
+    """
+    Solve a linear programming problem in tableau form.
+    
+    Args:
+        tableau: The initial tableau
+        basic_vars: List of basic variable indices
+        track_iterations: Whether to track tableau and pivot history
+    
+    Returns:
+        If track_iterations=False:
+            tuple: (solution vector, optimal value)
+        If track_iterations=True:
+            tuple: (solution vector, optimal value, tableau_history, pivot_history)
+    """
+    m, n = tableau.shape
+    n = n - 1  # Adjust for RHS column
+    max_iterations = 100  # Safety limit
+    iteration = 0
+    
+    tableau_history = [] if track_iterations else None
+    pivot_history = [] if track_iterations else None
+    
+    if track_iterations:
+        tableau_history.append(tableau.copy())
+    
+    while iteration < max_iterations:
+        # Find entering variable (most negative coefficient in objective row)
+        z_row = tableau[-1, :-1]
+        entering_col = np.argmin(z_row)
+        
+        if z_row[entering_col] >= -1e-10:  # Optimal solution found
+            # Extract solution
+            solution = np.zeros(n)
+            for i, basic_var in enumerate(basic_vars):
+                if basic_var < n:  # Only store original variables
+                    solution[basic_var] = tableau[i, -1]
+            
+            optimal_value = -tableau[-1, -1]  # Negated because tableau uses -z
+            
+            if track_iterations:
+                return solution, optimal_value, tableau_history, pivot_history
+            return solution, optimal_value
+        
+        # Find leaving variable (minimum ratio test)
+        pivot_ratios = []
+        for i in range(m-1):  # Skip objective row
+            if tableau[i, entering_col] > 1e-10:
+                ratio = tableau[i, -1] / tableau[i, entering_col]
+                pivot_ratios.append((ratio, i))
+        
+        if not pivot_ratios:  # Unbounded solution
+            if track_iterations:
+                return None, None, tableau_history, pivot_history
+            return None, None
+        
+        # Choose row with minimum positive ratio
+        pivot_row = min(pivot_ratios)[1]
+        
+        if track_iterations:
+            pivot_history.append((pivot_row, entering_col))
+        
+        # Pivot operation
+        pivot_element = tableau[pivot_row, entering_col]
+        tableau[pivot_row] /= pivot_element
+        
+        for i in range(m):
+            if i != pivot_row:
+                tableau[i] -= tableau[i, entering_col] * tableau[pivot_row]
+        
+        # Update basic variables
+        basic_vars[pivot_row] = entering_col
+        
+        if track_iterations:
+            tableau_history.append(tableau.copy())
+        
+        iteration += 1
+    
+    # Max iterations reached
+    if track_iterations:
+        return None, None, tableau_history, pivot_history
+    return None, None

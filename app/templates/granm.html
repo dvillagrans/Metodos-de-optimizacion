@@ -20,71 +20,74 @@
                 </h5>
             </div>
             <div class="card-body">
+                <!-- Math input section: allow intuitive mathematical language and convert to form -->
+                <div class="mb-3">
+                    <label for="math_input" class="form-label">Entrada en Lenguaje Matemático (opcional):</label>
+                    <textarea class="form-control" id="math_input" rows="3"
+                        placeholder="Ejemplo: Z=3x1+2x2 sujeto a x1+x2=4; x1+2x2>=6"></textarea>
+                    <div class="form-text">Puedes escribir la función objetivo y restricciones en lenguaje matemático;
+                        luego haz clic en Convertir.</div>
+                    <button type="button" class="btn btn-secondary mt-2" onclick="parseMathInput()">Convertir</button>
+                </div>
                 <form method="POST" action="{{ url_for('main.resolver_granm') }}">
-                    <!-- Botones de ejemplo -->
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">
-                            <i class="fas fa-star text-warning me-1"></i>Ejemplos Rápidos:
-                        </label>
-                        <div class="d-flex flex-wrap gap-2 mb-2">
-                            <button type="button" class="btn btn-outline-secondary btn-sm"
-                                onclick="loadExample('granm', 0)"
-                                title="Maximizar: 2x₁ + 3x₂ con restricción de igualdad">
-                                <i class="fas fa-lightbulb me-1"></i>Ejemplo 1 - Gran M
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm"
-                                onclick="loadExample('granm', 1)"
-                                title="Maximizar: 3x₁ + 2x₂ + x₃ con múltiples igualdades">
-                                <i class="fas fa-lightbulb me-1"></i>Ejemplo 2 - Sistema Mixto
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm"
-                                onclick="loadExample('granm', 2)"
-                                title="Minimizar: 4x₁ + 5x₂ con restricción de igualdad">
-                                <i class="fas fa-lightbulb me-1"></i>Ejemplo 3 - Minimización
-                            </button>
-                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearForm()">
-                                <i class="fas fa-eraser me-1"></i>Limpiar
-                            </button>
-                        </div>
-                    </div>
-
                     <div class="mb-3">
                         <label for="c" class="form-label">Función Objetivo (c):</label>
-                        <input type="text" class="form-control" id="c" name="c" placeholder="Ej: 3,2,1" required>
+                        <input type="text" class="form-control" id="c" name="c" placeholder="Ej: 3,2,1"
+                            value="{{ form_data.c if form_data else '' }}" required>
                         <div class="form-text">Coeficientes separados por comas</div>
                     </div>
 
                     <div class="mb-3">
                         <label for="A" class="form-label">Matriz de Restricciones (A):</label>
                         <textarea class="form-control" id="A" name="A" rows="4" placeholder="1,2,1&#10;2,1,3&#10;1,1,1"
-                            required></textarea>
+                            required>{{ form_data.A if form_data else '' }}</textarea>
                         <div class="form-text">Una fila por línea, coeficientes separados por comas</div>
                     </div>
 
                     <div class="mb-3">
                         <label for="b" class="form-label">Vector de Recursos (b):</label>
-                        <input type="text" class="form-control" id="b" name="b" placeholder="Ej: 12,8,6" required>
+                        <input type="text" class="form-control" id="b" name="b" placeholder="Ej: 12,8,6"
+                            value="{{ form_data.b if form_data else '' }}" required>
                         <div class="form-text">Valores separados por comas</div>
                     </div>
-
                     <div class="mb-3">
                         <label for="eq_constraints" class="form-label">Restricciones de Igualdad:</label>
                         <input type="text" class="form-control" id="eq_constraints" name="eq_constraints"
-                            placeholder="Ej: 0,2 (opcional)">
-                        <div class="form-text">Índices de restricciones de igualdad (empezando desde 0), separados por
-                            comas</div>
+                            placeholder="Ej: 0,2 (opcional)"
+                            value="{{ form_data.eq_constraints if form_data else '' }}">
+                        <div class="form-text">
+                            <strong>Índices de restricciones de igualdad (empezando desde 0), separados por
+                                comas</strong><br>
+                            <small class="text-muted">
+                                📝 Ejemplo: Si tienes 3 restricciones y la primera y tercera son de igualdad (=),
+                                escribe: 0,2<br>
+                                ⚡ Para tu problema actual: Si x₁ + x₂ = 4 es la primera restricción, escribe: 0
+                            </small>
+                        </div>
+                    </div>
+                    <!-- Nueva entrada: índices de restricciones ≥ -->
+                    <div class="mb-3">
+                        <label for="ge_constraints" class="form-label">Restricciones ≥ (índices):</label>
+                        <input type="text" class="form-control" id="ge_constraints" name="ge_constraints"
+                            placeholder="Ej: 1 (opcional)" value="{{ form_data.ge_constraints if form_data else '' }}">
+                        <div class="form-text">
+                            <strong>Índices de restricciones ≥, separados por comas</strong><br>
+                            <small class="text-muted">Ejemplo: si la segunda restricción es ≥, escribe: 1</small>
+                        </div>
                     </div>
 
                     <div class="mb-3">
                         <label for="M" class="form-label">Valor de M:</label>
-                        <input type="number" class="form-control" id="M" name="M" value="1000" step="1" min="1">
+                        <input type="number" class="form-control" id="M" name="M"
+                            value="{{ form_data.M if form_data else '1000' }}" step="1" min="1">
                         <div class="form-text">Valor grande para penalización (por defecto: 1000)</div>
                     </div>
 
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-check mb-3">
-                                <input class="form-check-input" type="checkbox" id="minimize" name="minimize">
+                                <input class="form-check-input" type="checkbox" id="minimize" name="minimize"
+                                    {{ 'checked' if form_data and form_data.minimize else '' }}>
                                 <label class="form-check-label" for="minimize">
                                     Minimizar (por defecto se maximiza)
                                 </label>
@@ -93,7 +96,8 @@
                         <div class="col-md-6">
                             <div class="form-check mb-3">
                                 <input class="form-check-input" type="checkbox" id="track_iterations"
-                                    name="track_iterations">
+                                    name="track_iterations" {{ 'checked' if form_data and form_data.track_iterations
+                                    else '' }}>
                                 <label class="form-check-label" for="track_iterations">
                                     Mostrar iteraciones
                                 </label>
@@ -125,9 +129,54 @@
             <h4 class="text-success mb-3">
                 <i class="fas fa-check-circle me-2"></i>Solución Encontrada
             </h4>
-
             <div class="card mb-3">
                 <div class="card-body">
+                    {% if resultado.has_multiple_solutions %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>⚠️ Este problema tiene soluciones óptimas múltiples.</strong>
+                        {% if resultado.multiple_solution_vars %}
+                        <br>
+                        <small>Variables candidatas:
+                            {% for var in resultado.multiple_solution_vars %}
+                            x₍{{ var + 1 }}₎{% if not loop.last %}, {% endif %}
+                            {% endfor %}
+                        </small>
+                        {% endif %}
+                    </div>
+
+                    <h6>Solución Base:</h6>
+                    <div class="row">
+                        {% for i in range(resultado.solution|length) %}
+                        <div class="col-auto">
+                            <span class="badge bg-success">x{{ i+1 }} = {{ "%.4f"|format(resultado.solution[i])
+                                }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    {% if resultado.alternative_solutions %}
+                    <div class="mt-3">
+                        <h6><i class="fas fa-list-alt me-2"></i>Soluciones alternativas:</h6>
+                        {% for alt_sol in resultado.alternative_solutions %}
+                        <div class="card mt-2" style="border-left: 4px solid #28a745;">
+                            <div class="card-body py-2">
+                                <small class="text-muted">Pivoteando x₍{{ alt_sol.entering_var + 1 }}₎ → Base</small>
+                                <div class="row">
+                                    {% for val in alt_sol.solution %}
+                                    <div class="col-auto">
+                                        <span class="badge bg-outline-success">x{{ loop.index }} = {{ "%.4f"|format(val)
+                                            }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {% else %}
                     <h6>Solución Óptima:</h6>
                     <div class="row">
                         {% for i in range(resultado.solution|length) %}
@@ -137,6 +186,8 @@
                         </div>
                         {% endfor %}
                     </div>
+                    {% endif %}
+
                     <hr>
                     <h6>Valor Óptimo: <span class="text-success">{{ "%.4f"|format(resultado.optimal_value) }}</span>
                     </h6>
@@ -189,6 +240,43 @@
                     </div>
                 </div>
             </div> {% endif %}
+
+            <!-- JSON Download Section -->
+            {% if resultado and resultado.success %}
+            <div class="json-download-section">
+                <div class="card mt-3">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-download me-2"></i>Descargar Resultados
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-2">
+                            <i class="fas fa-file-code me-2"></i>
+                            Descarga los resultados completos en formato JSON para análisis posterior
+                        </p>
+                        <form method="POST" action="{{ url_for('main.descargar_granm_json') }}" class="d-inline">
+                            <!-- Hidden fields to preserve form data -->
+                            <input type="hidden" name="c" value="{{ form_data.c if form_data else '' }}">
+                            <input type="hidden" name="A" value="{{ form_data.A if form_data else '' }}">
+                            <input type="hidden" name="b" value="{{ form_data.b if form_data else '' }}">
+                            <input type="hidden" name="M" value="{{ form_data.M if form_data else '' }}"> <input
+                                type="hidden" name="minimize"
+                                value="{{ 'on' if form_data and form_data.minimize else '' }}">
+                            <input type="hidden" name="track_iterations"
+                                value="{{ 'on' if form_data and form_data.track_iterations else '' }}">
+
+                            <!-- Hidden field for results -->
+                            <input type="hidden" name="resultado_json" value="{{ resultado | tojson | e }}">
+
+                            <button type="submit" class="btn btn-info btn-download-json">
+                                <i class="fas fa-download me-2"></i>Descargar JSON
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
             {% endif %}
 
             {% if video_url %}
@@ -216,4 +304,67 @@
 </div>
 
 <script src="{{ url_for('static', filename='js/examples.js') }}"></script>
+<script>
+    // Parse intuitive math input and populate form fields
+    function parseMathInput() {
+        // Read and normalize input
+        let input = document.getElementById('math_input').value;
+        if (!input) return;
+        // Normalize subscript digits (₀–₉) to normal digits
+        const subMap = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9' };
+        input = input.replace(/[₀₁₂₃₄₅₆₇₈₉]/g, ch => subMap[ch]);
+        // Detect MAX/MIN at start
+        let minimizeFlag = false;
+        const objMatch = input.match(/^\s*(MAX|MIN)\b/i);
+        if (objMatch) {
+            minimizeFlag = /^MIN/i.test(objMatch[1]);
+            input = input.replace(/^\s*(MAX|MIN)\b/i, '').trim();
+        }
+        // Split objective and constraints by 'sujeto a', 's.a.' (Spanish) or 'subject to'
+        const parts = input.split(/sujeto a|s\.a\.?|subject to/i);
+        let objPart = parts[0].trim();
+        if (/^Z=/i.test(objPart)) objPart = objPart.replace(/^Z=/i, '');
+        // Match terms like '3x1', '+2x2', '-x3'
+        const termPattern = /([+-]?\s*\d*\.?\d*)\s*x(\d+)/g;
+        const coeffs = [];
+        let match;
+        while ((match = termPattern.exec(objPart)) !== null) {
+            let val = match[1].replace(/\s+/g, '');
+            if (val === '' || val === '+') val = '1';
+            if (val === '-') val = '-1';
+            coeffs[parseInt(match[2], 10) - 1] = parseFloat(val);
+        }
+        // Fill missing coefficients with 0
+        for (let i = 0; i < coeffs.length; i++) if (coeffs[i] == null) coeffs[i] = 0;
+        document.getElementById('c').value = coeffs.join(',');
+        // Set minimize checkbox if applicable
+        document.getElementById('minimize').checked = minimizeFlag;
+        // Parse constraints
+        const consPart = parts[1] || '';
+        // Split constraints by semicolon or newlines (handling Windows CRLF)
+        const rawCons = consPart.split(/;|\r?\n/).map(s => s.trim()).filter(Boolean);
+        const A = [], b = [], eq = [];
+        rawCons.forEach((constr, idx) => {
+            const m = constr.match(/(.+?)(<=|>=|=)(.+)/);
+            if (!m) return;
+            const lhs = m[1].trim(), op = m[2], rhs = m[3].trim();
+            const row = [];
+            termPattern.lastIndex = 0;
+            let t;
+            while ((t = termPattern.exec(lhs)) !== null) {
+                let v = t[1].replace(/\s+/g, '');
+                if (v === '' || v === '+') v = '1';
+                if (v === '-') v = '-1';
+                row[parseInt(t[2], 10) - 1] = parseFloat(v);
+            }
+            for (let i = 0; i < coeffs.length; i++) if (row[i] == null) row[i] = 0;
+            A.push(row.join(','));
+            b.push(parseFloat(rhs));
+            if (op === '=') eq.push(idx);
+        });
+        document.getElementById('A').value = A.join('\n');
+        document.getElementById('b').value = b.join(',');
+        document.getElementById('eq_constraints').value = eq.join(',');
+    }
+</script>
 {% endblock %}

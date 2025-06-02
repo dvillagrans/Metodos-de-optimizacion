@@ -57,6 +57,28 @@
         .alert {
             border-radius: 8px;
         }
+
+        /* Estilos específicos para errores de optimización */
+        .alert-unbounded {
+            background-color: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+
+        .alert-infeasible {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        .alert-optimization-error {
+            border-left: 4px solid #e74c3c;
+        }
+
+        .error-icon {
+            font-size: 1.2em;
+            margin-right: 0.5em;
+        }
     </style>
 </head>
 
@@ -98,12 +120,27 @@
         </div>
     </nav>
 
-    <main class="container mt-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
+    <main class="container mt-4"> {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         {% for category, message in messages %}
-        <div class="alert alert-{{ 'danger' if category == 'error' else 'info' }} alert-dismissible fade show"
+        {% set alert_class = 'danger' if category == 'error' else ('warning' if category == 'danger' else 'info') %}
+        {% set icon_class = 'fas fa-exclamation-triangle' if 'unbounded' in message.lower() else ('fas fa-times-circle'
+        if 'infeasible' in message.lower() else 'fas fa-exclamation-circle') %}
+
+        <div class="alert alert-{{ alert_class }} alert-dismissible fade show {{ 'alert-optimization-error' if 'método' in message.lower() else '' }}"
             role="alert">
+            <i class="{{ icon_class }} error-icon"></i>
+            <strong>
+                {% if 'unbounded' in message.lower() %}
+                Problema No Acotado:
+                {% elif 'infeasible' in message.lower() %}
+                Problema Infactible:
+                {% elif 'método' in message.lower() %}
+                Error de Optimización:
+                {% else %}
+                Error:
+                {% endif %}
+            </strong>
             {{ message }}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>

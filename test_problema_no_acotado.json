@@ -1,0 +1,52 @@
+{
+    "problema_no_acotado": {
+        "descripcion": "Problema que definitivamente es no acotado - para probar el error",
+        "funcion_objetivo": [
+            1,
+            1
+        ],
+        "comentario": "Maximizar Z = x1 + x2",
+        "matriz_restricciones": [
+            [
+                -1,
+                1
+            ],
+            [
+                -1,
+                -1
+            ]
+        ],
+        "vector_recursos": [
+            1,
+            -2
+        ],
+        "comentario_restricciones": [
+            "-x1 + x2 <= 1",
+            "-x1 - x2 <= -2"
+        ],
+        "minimizar": false,
+        "razon": "Este problema es no acotado porque las restricciones no limitan el crecimiento de las variables en la dirección que mejora la función objetivo"
+    },
+    "problema_no_acotado_simple": {
+        "descripcion": "Versión más simple de problema no acotado",
+        "funcion_objetivo": [
+            1,
+            0
+        ],
+        "comentario": "Maximizar Z = x1",
+        "matriz_restricciones": [
+            [
+                -1,
+                1
+            ]
+        ],
+        "vector_recursos": [
+            1
+        ],
+        "comentario_restricciones": [
+            "-x1 + x2 <= 1"
+        ],
+        "minimizar": false,
+        "razon": "x1 puede crecer infinitamente sin violar las restricciones"
+    }
+}

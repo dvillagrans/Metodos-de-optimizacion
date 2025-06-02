@@ -5,6 +5,7 @@ import sys
 import time
 import logging
 import shutil
+import hashlib
 import numpy as np
 from manim import *
 
@@ -12,6 +13,52 @@ from manim import *
 logging.basicConfig(level=logging.INFO, 
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+def generate_data_hash(data):
+    """Generate a hash from animation data for caching purposes."""
+    try:
+        # Convert data to a consistent string representation
+        data_str = json.dumps(data, sort_keys=True, default=str)
+        return hashlib.md5(data_str.encode()).hexdigest()
+    except Exception as e:
+        logger.warning(f"Could not generate hash for caching: {e}")
+        return None
+
+def check_animation_cache(data_hash, output_dir):
+    """Check if animation already exists in cache."""
+    if not data_hash:
+        return None
+    
+    cache_dir = os.path.join(output_dir, 'cache')
+    os.makedirs(cache_dir, exist_ok=True)
+    
+    # Check for both video and image formats
+    for ext in ['.mp4', '.png']:
+        cache_file = os.path.join(cache_dir, f"{data_hash}{ext}")
+        if os.path.exists(cache_file):
+            logger.info(f"Found cached animation: {cache_file}")
+            return cache_file
+    
+    return None
+
+def save_to_cache(media_path, data_hash, output_dir):
+    """Save generated animation to cache."""
+    if not data_hash or not media_path or not os.path.exists(media_path):
+        return False
+    
+    try:
+        cache_dir = os.path.join(output_dir, 'cache')
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        file_ext = os.path.splitext(media_path)[1]
+        cache_file = os.path.join(cache_dir, f"{data_hash}{file_ext}")
+        
+        shutil.copy2(media_path, cache_file)
+        logger.info(f"Saved animation to cache: {cache_file}")
+        return True
+    except Exception as e:
+        logger.warning(f"Could not save to cache: {e}")
+        return False
 
 def check_ffmpeg():
     """Check if FFmpeg is available and properly configured."""
@@ -151,7 +198,28 @@ def generate_manim_animation(c, A, b, solution, z_opt, minimize=False, method="s
             logger.warning(ffmpeg_warning)
             # Continue anyway, but warn the user
         
-        # Create necessary directories if they don't exist
+        # Prepare data for caching
+        animation_data = {
+            'c': c, 'A': A, 'b': b, 'solution': solution, 'z_opt': z_opt,
+            'minimize': minimize, 'method': method,
+            'tableau_history': tableau_history, 'pivot_history': pivot_history
+        }
+        
+        # Generate hash for caching
+        data_hash = generate_data_hash(animation_data)
+        
+        # Setup directories
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        animation_dir = os.path.join(current_dir, '..', 'manim_anim')
+        output_dir = os.path.join(current_dir, '..', 'output', 'videos')
+        
+        # Check cache first
+        if data_hash:
+            cached_file = check_animation_cache(data_hash, output_dir)
+            if cached_file:
+                return cached_file
+        
+        logger.info(f"Generating new animation for method: {method}")# Create necessary directories if they don't exist
         animation_dir = os.path.join(os.path.dirname(__file__), '..', 'manim_anim')
         output_dir = os.path.join(os.path.dirname(__file__), '..', 'output', 'videos')
         
@@ -173,6 +241,14 @@ def generate_manim_animation(c, A, b, solution, z_opt, minimize=False, method="s
         
         # Clean data for JSON serialization
         clean_data = convert_numpy_types(data)
+        
+        # Generate a hash for the data
+        data_hash = generate_data_hash(clean_data)
+        
+        # Check if animation is already cached
+        cached_animation = check_animation_cache(data_hash, output_dir)
+        if cached_animation:
+            return cached_animation
         
         # Determine animation type based on problem characteristics
         num_variables = len(c) if c else 0
@@ -318,6 +394,10 @@ def generate_advanced_simplex_animation(data, animation_dir, output_dir):
                 video_files.sort(key=os.path.getmtime, reverse=True)
                 latest_video = video_files[0]
                 logger.info(f"Generated advanced video: {latest_video}")
+                
+                # Save to cache
+                save_to_cache(latest_video, data_hash, output_dir)
+                
                 return latest_video
         
         logger.warning("Advanced animation failed, falling back to basic animation")
@@ -455,6 +535,10 @@ def generate_basic_animation(data, animation_dir, output_dir):
                 video_files.sort(key=os.path.getmtime, reverse=True)
                 latest_video = video_files[0]
                 logger.info(f"Generated basic video: {latest_video}")
+                
+                # Save to cache
+                save_to_cache(latest_video, data_hash, output_dir)
+                
                 return latest_video
             else:
                 # Look for PNG files if no video was found
@@ -720,6 +804,15 @@ def generate_simplex_2d_animation(data, animation_dir, output_dir):
 def generate_simplex_3d_animation(data, animation_dir, output_dir):
     """Generate 3D Simplex animation with geometric visualization."""
     try:
+        # Generate hash for caching
+        data_hash = generate_data_hash(data)
+        
+        # Check cache first
+        if data_hash:
+            cached_file = check_animation_cache(data_hash, output_dir)
+            if cached_file:
+                return cached_file
+        
         # Convert and save data
         converted_data = convert_numpy_types(data)
         data_file = os.path.join(animation_dir, 'problem_data.json')
@@ -727,16 +820,17 @@ def generate_simplex_3d_animation(data, animation_dir, output_dir):
             json.dump(converted_data, f, ensure_ascii=True, indent=2)
         
         # Python executable path
-        python_exe = sys.executable        # Command to run 3D animation
+        python_exe = sys.executable
+          # Command to run 3D animation - using PNG format which works reliably
         cmd = [
             python_exe,
             "-m", "manim",
             "simplex_3d_anim.py",
             "Simplex3DAnim",
-            "-qm",  # Medium quality
-            "--format", "mp4",
+            "-ql",  # Low quality for better compatibility
             f"--media_dir={output_dir}",
-            "--disable_caching"
+            "--disable_caching",
+            "-s"  # Save last frame as PNG (already implies PNG format)
         ]
         
         logger.info(f"Running 3D Simplex animation: {cmd}")
@@ -756,16 +850,38 @@ def generate_simplex_3d_animation(data, animation_dir, output_dir):
         
         stdout, stderr = process.communicate(timeout=180)
         
-        if process.returncode == 0:
-            # Look for generated video
+        # Log the manim output for debugging
+        if stdout:
+            logger.info(f"Manim stdout: {stdout[:500]}...")
+        if stderr:
+            logger.warning(f"Manim stderr: {stderr[:500]}...")
+        
+        if process.returncode == 0:            # Look for generated PNG as primary option
+            png_path = find_generated_image(animation_dir, "Simplex3DAnim")
+            if png_path:
+                logger.info(f"3D animation PNG generated: {png_path}")
+                # Save to cache
+                if data_hash:
+                    save_to_cache(png_path, data_hash, output_dir)
+                return png_path
+                
+            # Look for generated video as fallback
             video_path = find_generated_video(output_dir, "Simplex3DAnim")
             if video_path:
                 logger.info(f"3D animation generated successfully: {video_path}")
+                # Save to cache
+                if data_hash:
+                    save_to_cache(video_path, data_hash, output_dir)
                 return video_path
+        else:
+            logger.error(f"Manim process failed with return code: {process.returncode}")
         
         logger.warning("3D animation failed, falling back to basic animation")
         return generate_basic_animation(data, animation_dir, output_dir)
         
+    except subprocess.TimeoutExpired:
+        logger.error("3D animation timed out, falling back to basic animation")
+        return generate_basic_animation(data, animation_dir, output_dir)
     except Exception as e:
         logger.error(f"Error in 3D animation: {e}")
         return generate_basic_animation(data, animation_dir, output_dir)
@@ -871,4 +987,34 @@ def find_generated_video(output_dir, scene_name):
             return latest_file
     
     logger.warning(f"No video files found for scene {scene_name} in {output_dir}")
+    return None
+
+def find_generated_image(animation_dir, scene_name):
+    """Helper function to find generated PNG image files."""
+    import glob
+    import time
+    
+    # Wait for file system to update
+    time.sleep(1)
+    
+    # Try multiple patterns to find generated PNG files
+    search_patterns = [
+        f"{animation_dir}/media/images/**/{scene_name}*.png",
+        f"{animation_dir}/media/**/{scene_name}*.png",
+        f"{animation_dir}/**/{scene_name}*.png"
+    ]
+    
+    all_found_files = []
+    for pattern in search_patterns:
+        files = glob.glob(pattern, recursive=True)
+        all_found_files.extend(files)
+    
+    if all_found_files:
+        # Remove duplicates and return the most recent file
+        unique_files = list(set(all_found_files))
+        latest_file = max(unique_files, key=os.path.getctime)
+        logger.info(f"Found PNG file: {latest_file}")
+        return latest_file
+    
+    logger.warning(f"No PNG files found for scene {scene_name} in {animation_dir}")
     return None

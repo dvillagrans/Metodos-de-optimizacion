@@ -16,14 +16,21 @@ const examples = {
             b: "10,8,7",
             minimize: false,
             description: "Maximizar: 3x₁ + 4x₂ + 6x₃"
-        },
-        {
+        }, {
             name: "Ejemplo 3 - Inversión",
             c: "0.2,0.3,0.1",
             A: "1,1,1\n0.5,0.2,0.3\n0.1,0.4,0.2",
             b: "1000,400,300",
             minimize: false,
             description: "Maximizar: 0.2x₁ + 0.3x₂ + 0.1x₃"
+        },
+        {
+            name: "Ejemplo 4 - No Acotado",
+            c: "1,1",
+            A: "-1,1\n-1,-1",
+            b: "1,-2",
+            minimize: false,
+            description: "Problema no acotado para probar detección de errores"
         }
     ],
     granm: [
@@ -195,6 +202,169 @@ function clearForm() {
     showNotification('Formulario limpiado', 'info');
 }
 
+// Funciones para persistencia de datos en localStorage
+function saveFormData(method) {
+    const formData = {};
+    const form = document.querySelector('form[method="POST"]');
+
+    if (form) {
+        const inputs = form.querySelectorAll('input, textarea, select');
+        inputs.forEach(input => {
+            if (input.type === 'checkbox') {
+                formData[input.name] = input.checked;
+            } else {
+                formData[input.name] = input.value;
+            }
+        });
+
+        localStorage.setItem(`${method}_form_data`, JSON.stringify(formData));
+    }
+}
+
+function loadFormData(method) {
+    const savedData = localStorage.getItem(`${method}_form_data`);
+    if (savedData) {
+        try {
+            const formData = JSON.parse(savedData);
+            const form = document.querySelector('form[method="POST"]');
+
+            if (form) {
+                Object.keys(formData).forEach(key => {
+                    const input = form.querySelector(`[name="${key}"]`);
+                    if (input) {
+                        if (input.type === 'checkbox') {
+                            input.checked = formData[key];
+                        } else {
+                            input.value = formData[key];
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Error al cargar datos guardados:', e);
+        }
+    }
+}
+
+function clearFormData(method) {
+    localStorage.removeItem(`${method}_form_data`);
+    // También limpiar el formulario actual
+    const form = document.querySelector('form[method="POST"]');
+    if (form) {
+        form.reset();
+    }
+}
+
+// Auto-guardar datos del formulario mientras el usuario escribe
+function setupAutoSave(method) {
+    const form = document.querySelector('form[method="POST"]');
+    if (form) {
+        const inputs = form.querySelectorAll('input, textarea, select');
+        inputs.forEach(input => {
+            input.addEventListener('input', () => {
+                setTimeout(() => saveFormData(method), 500); // Debounce de 500ms
+            });
+            input.addEventListener('change', () => {
+                saveFormData(method);
+            });
+        });
+    }
+}
+
+// Funciones específicas para cada método
+function setupMethodFeatures(method) {
+    // Auto-guardar
+    setupAutoSave(method);
+
+    // Agregar botón para limpiar datos
+    const form = document.querySelector('form[method="POST"]');
+    if (form) {
+        const clearButton = document.createElement('button');
+        clearButton.type = 'button';
+        clearButton.className = 'btn btn-outline-secondary btn-sm ms-2';
+        clearButton.innerHTML = '<i class="fas fa-trash me-1"></i>Limpiar';
+        clearButton.onclick = () => {
+            if (confirm('¿Estás seguro de que quieres limpiar todos los datos?')) {
+                clearFormData(method);
+            }
+        };
+
+        // Insertar el botón después del último botón del formulario
+        const lastButtonContainer = form.querySelector('.row:last-child .col-md-6:last-child');
+        if (lastButtonContainer) {
+            const buttonWrapper = document.createElement('div');
+            buttonWrapper.className = 'mt-2';
+            buttonWrapper.appendChild(clearButton);
+            lastButtonContainer.appendChild(buttonWrapper);
+        }
+    }
+
+    // Mejorar feedback del botón de descarga JSON
+    const downloadButton = document.querySelector('.btn-download-json');
+    if (downloadButton) {
+        downloadButton.addEventListener('click', function () {
+            const originalContent = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Descargando...';
+            this.classList.add('downloading');
+            this.disabled = true;
+
+            // Re-habilitar después de un momento (en caso de error)
+            setTimeout(() => {
+                this.innerHTML = originalContent;
+                this.classList.remove('downloading');
+                this.disabled = false;
+            }, 3000);
+        });
+    }
+
+    // Verificar si hay datos en los campos y agregar indicador visual
+    if (form) {
+        const inputs = form.querySelectorAll('input[type="text"], input[type="checkbox"], textarea');
+        inputs.forEach(input => {
+            if (input.type === 'checkbox' ? input.checked : input.value.trim() !== '') {
+                input.classList.add('has-saved-data');
+            }
+        });
+
+        // Mostrar mensaje si hay datos guardados
+        const hasData = Array.from(inputs).some(input =>
+            input.type === 'checkbox' ? input.checked : input.value.trim() !== ''
+        );
+        if (hasData) {
+            showDataPreservedMessage();
+        }
+    }
+}
+
+// Funciones específicas para el método dos fases (mantener compatibilidad)
+function setupDosFasesFeatures() {
+    setupMethodFeatures('dosfases');
+}
+
+// Función para mostrar mensaje de datos preservados
+function showDataPreservedMessage() {
+    const form = document.querySelector('form[method="POST"]');
+    if (form) {
+        const message = document.createElement('div');
+        message.className = 'alert alert-info alert-dismissible fade show mt-2';
+        message.innerHTML = `
+            <i class="fas fa-info-circle me-2"></i>
+            Los datos de tu formulario anterior se han mantenido.
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        // Insertar el mensaje antes del formulario
+        form.parentNode.insertBefore(message, form);
+
+        // Auto-ocultar después de 5 segundos
+        setTimeout(() => {
+            if (message.parentNode) {
+                message.remove();
+            }
+        }, 5000);
+    }
+}
+
 // Inicialización cuando se carga la página
 document.addEventListener('DOMContentLoaded', function () {
     // Detectar método actual basado en la URL o clase del body
@@ -229,5 +399,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 form.insertBefore(exampleButtonsContainer, firstFormGroup);
             }
         }
+    }
+
+    // Cargar datos guardados y configurar características del método
+    if (currentMethod) {
+        loadFormData(currentMethod);
+        setupMethodFeatures(currentMethod);
     }
 });
