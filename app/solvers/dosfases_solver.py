@@ -123,10 +123,9 @@ def dosfases_solver(c, A, b, eq_constraints=None, ge_constraints=None, minimize=
     
     if track_iterations:
         tableau_history.append(tableau1.copy())
-    
-    # Solve Phase 1
+      # Solve Phase 1
     solution1, optimal_value1, phase1_tableau_history, phase1_pivot_history = solve_tableau(
-        tableau1, basic_vars, track_iterations
+        tableau1, basic_vars, track_iterations, minimize=True  # Fase 1 siempre es minimización
     )
     
     if track_iterations and solution1 is not None:
@@ -186,11 +185,10 @@ def dosfases_solver(c, A, b, eq_constraints=None, ge_constraints=None, minimize=
                         break
     
     if track_iterations:
-        tableau_history.append(tableau2.copy())
-    
+        tableau_history.append(tableau2.copy())    
     # Solve Phase 2
     solution2, optimal_value2, phase2_tableau_history, phase2_pivot_history = solve_tableau(
-        tableau2, basic_vars_phase2, track_iterations
+        tableau2, basic_vars_phase2, track_iterations, minimize  # Fase 2 usa el tipo original
     )
     
     if track_iterations and solution2 is not None:
@@ -238,10 +236,9 @@ def solve_standard_form(c, A, b, minimize=False, track_iterations=False):
     
     # Initial basic variables (slack variables)
     basic_vars = list(range(n_orig, n_total_vars_in_A))
-    
-    # Solve the tableau
+      # Solve the tableau
     solution, optimal_value, tableau_history, pivot_history = solve_tableau(
-        tableau, basic_vars, track_iterations
+        tableau, basic_vars, track_iterations, minimize
     )
     
     if solution is None:
@@ -275,7 +272,7 @@ def create_tableau(c, A, b, maximize=True):
     return tableau
 
 
-def solve_tableau(tableau, basic_vars, track_iterations=False):
+def solve_tableau(tableau, basic_vars, track_iterations=False, minimize=False):
     """
     Solve a linear programming problem in tableau form.
     
@@ -305,15 +302,19 @@ def solve_tableau(tableau, basic_vars, track_iterations=False):
         # Find entering variable (most negative coefficient in objective row)
         z_row = tableau[-1, :-1]
         entering_col = np.argmin(z_row)
-        
         if z_row[entering_col] >= -1e-10:  # Optimal solution found
             # Extract solution
             solution = np.zeros(n)
             for i, basic_var in enumerate(basic_vars):
                 if basic_var < n:  # Only store original variables
                     solution[basic_var] = tableau[i, -1]
-            
-            optimal_value = -tableau[-1, -1]  # Negated because tableau uses -z
+              # For maximization problems, the tableau objective row contains -c,
+            # so the optimal value in tableau[-1, -1] is already the correct positive value.
+            # For minimization problems, we need to consider the minimize flag.
+            if minimize:
+                optimal_value = -tableau[-1, -1]  # Negate for minimization
+            else:
+                optimal_value = tableau[-1, -1]   # Use directly for maximization
             
             if track_iterations:
                 return solution, optimal_value, tableau_history, pivot_history

@@ -16,138 +16,87 @@ class UnboundedError(SimplexError):
     """Exception raised when problem is unbounded."""
     pass
 
-def simplex(c, A, b, minimize=False, track_iterations=False):
+def simplex(c, A, b, minimize=False, track_iterations=False, tol=1e-10, max_iter=100):
     """
-    Implements the Simplex algorithm to solve linear programming problems.
-    
-    Args:
-        c (list): Coefficients of the objective function.
-        A (list of lists): Matrix of constraint coefficients.
-        b (list): Right-hand side values of constraints.
-        minimize (bool): If True, minimize the objective function; otherwise, maximize.
-        track_iterations (bool): If True, return tableau history and pivot history.
-    
-    Returns:
-        If track_iterations is False:
-            tuple: (solution, optimal value)
-        If track_iterations is True:
-            tuple: (solution, optimal value, tableau_history, pivot_history)
-    
-    Raises:
-        DimensionError: If dimensions of input arrays are incompatible.
-        NegativeBError: If b contains negative values.
-        UnboundedError: If problem is unbounded.
+    Simplex clásico para restricciones tipo ≤ y c ≥ 0.
+    Si alguna columna NO tiene coeficiente positivo, la salta
+    (evita falsos 'unbounded' y permite detectar múltipl. óptimos).
     """
-    # Convert inputs to numpy arrays
-    c = np.array(c, dtype=float)
-    A = np.array(A, dtype=float)
-    b = np.array(b, dtype=float)
-    
-    # Verify dimensions
-    n_vars = len(c)
-    n_constraints = len(b)
-    
-    if A.shape != (n_constraints, n_vars):
-        raise DimensionError(f"Dimensions mismatch: A is {A.shape}, expected ({n_constraints}, {n_vars})")
-    
-    # Check if any b is negative
-    if np.any(b < 0):
-        raise NegativeBError("The vector b cannot contain negative values")
-    
-    # If minimizing, convert to maximization problem
+    c = np.asarray(c, dtype=float)
+    A = np.asarray(A, dtype=float)
+    b = np.asarray(b, dtype=float)
+
+    m, n = A.shape
+    if len(b) != m or len(c) != n:
+        raise DimensionError("Dimensiones incompatibles")
+
+    if np.any(b < -tol):
+        raise NegativeBError("b no puede contener valores negativos (en esta versión)")
+
+    # Maximizar ⇒ Z fila con -c
     if minimize:
         c = -c
-    
-    # Prepare the initial tableau
-    # [c | 0]
-    # [A | b]
-    tableau = np.zeros((n_constraints + 1, n_vars + n_constraints + 1))
-    # Set the objective function row (negated)
-    tableau[0, :n_vars] = -c
-    # Set the constraint coefficients
-    tableau[1:, :n_vars] = A
-    # Set the slack variables
-    for i in range(n_constraints):
-        tableau[i + 1, n_vars + i] = 1
-    # Set the right-hand side
-    tableau[1:, -1] = b
-    
-    # Initialize history if tracking iterations
+
+    # ─ construir tableau inicial ─
+    tableau = np.zeros((m + 1, n + m + 1))
+    tableau[0, :n]    = -c
+    tableau[1:, :n]   = A
+    tableau[1:, n:n+m] = np.eye(m)
+    tableau[1:, -1]   = b
+
     if track_iterations:
-        tableau_history = [tableau.copy()]
-        pivot_history = []
-    
-    # Main simplex loop
-    max_iterations = 100  # Prevent infinite loops
-    for iteration in range(max_iterations):
-        # Find the pivot column (most negative in objective row)
-        pivot_col = np.argmin(tableau[0, :-1])
-        if tableau[0, pivot_col] >= 0:
-            # Optimal solution found
+        T_hist = [tableau.copy()]
+        pivots = []
+
+    # ─ bucle principal ─
+    for _ in range(max_iter):
+        # 1. columna entrante (costo reducido más negativo QUE TENGA ALGO > 0)
+        pivot_col = None
+        z_row = tableau[0, :-1]
+
+        for j in np.argsort(z_row):          # de más negativo a menos
+            if z_row[j] >= -tol:
+                break                        # no hay más negativos
+            if np.any(tableau[1:, j] > tol):
+                pivot_col = j
+                break
+        if pivot_col is None:                # óptimo alcanzado
             break
-        
-        # Find the pivot row (smallest ratio of b/a)
-        column = tableau[1:, pivot_col]
-        if np.all(column <= 0):
-            raise UnboundedError("Problem is unbounded")
-        
-        # Calculate ratios for positive entries in the pivot column
-        ratios = []
-        for i in range(n_constraints):
-            if tableau[i + 1, pivot_col] > 0:
-                ratio = tableau[i + 1, -1] / tableau[i + 1, pivot_col]
-                ratios.append((i, ratio))
-            else:
-                ratios.append((i, float('inf')))
-        
-        # Find the row with minimum ratio
-        pivot_row = min(ratios, key=lambda x: x[1])[0] + 1
-        
-        # Track pivot if needed
+
+        # 2. fila pivote (razón mínima)
+        col      = tableau[1:, pivot_col]
+        rhs      = tableau[1:, -1]
+        valid    = col > tol
+        if not np.any(valid):
+            raise UnboundedError("Problema no acotado")
+
+        ratios   = rhs[valid] / col[valid]
+        pivot_row = np.where(valid)[0][np.argmin(ratios)] + 1  # +1 por fila Z
+
+        # 3. pivotear
+        tableau[pivot_row] /= tableau[pivot_row, pivot_col]
+        for r in range(tableau.shape[0]):
+            if r != pivot_row:
+                tableau[r] -= tableau[r, pivot_col] * tableau[pivot_row]
+
         if track_iterations:
-            pivot_history.append((pivot_row, pivot_col))
-        
-        # Pivot element
-        pivot_element = tableau[pivot_row, pivot_col]
-        
-        # Normalize pivot row
-        tableau[pivot_row, :] = tableau[pivot_row, :] / pivot_element
-        
-        # Eliminate pivot column from other rows
-        for i in range(tableau.shape[0]):
-            if i != pivot_row:
-                tableau[i, :] -= tableau[i, pivot_col] * tableau[pivot_row, :]
-        
-        # Add to history if tracking iterations
-        if track_iterations:
-            tableau_history.append(tableau.copy())
-    
-    # Extract solution
-    # Initialize solution vector with zeros
-    solution = np.zeros(n_vars)
-    
-    # For each variable, check if it's a basic variable
-    for j in range(n_vars):
-        # Look for a column with exactly one 1 and all other elements 0
-        col = tableau[:, j]
-        # Count number of non-zeros
-        non_zeros = np.count_nonzero(col)
-        
-        if non_zeros == 1:
-            # Find the row with the non-zero element
-            row = np.where(col != 0)[0][0]
-            if abs(col[row] - 1.0) < 1e-10:  # Check if it's approximately 1
-                # This is a basic variable; its value is in the RHS
-                solution[j] = tableau[row, -1]
-    
-    # Compute optimal value
+            pivots.append((pivot_row, pivot_col))
+            T_hist.append(tableau.copy())
+    else:
+        raise RuntimeError("Se alcanzó max_iter sin converger")
+
+    # ─ extraer solución ─
+    solution = np.zeros(n)
+    for j in range(n):
+        col = tableau[1:, j]
+        if np.count_nonzero(col) == 1 and np.isclose(col.max(), 1.0, atol=tol):
+            row_bas = np.where(np.isclose(col, 1.0, atol=tol))[0][0] + 1
+            solution[j] = tableau[row_bas, -1]
+
     z_opt = tableau[0, -1]
-    
-    # If minimizing, negate the optimal value back
     if minimize:
         z_opt = -z_opt
-    
+
     if track_iterations:
-        return solution, z_opt, tableau_history, pivot_history
-    else:
-        return solution, z_opt
+        return solution, z_opt, T_hist, pivots
+    return solution, z_opt

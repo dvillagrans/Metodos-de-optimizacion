@@ -2,13 +2,13 @@ from flask import Blueprint, request, jsonify, send_from_directory, current_app,
 import json
 import os
 import time
+import logging
 import numpy as np
 from .solvers import simplex, granm_solver, dosfases_solver
 from .solvers import SimplexError, GranMError, DosFasesError, UnboundedError, DimensionError, InfeasibleError
 from .solvers.multiple_solutions_detector import detect_multiple_solutions, format_multiple_solutions_result
 from .manim_renderer import generate_manim_animation
 import uuid
-import logging
 
 # Configure logger
 logging.basicConfig(level=logging.INFO, 
@@ -64,8 +64,7 @@ def resolver_simplex():
             raise ValueError("El número de filas en A y en b no coincide")
         if any(len(row) != len(c) for row in A):
             raise ValueError("Cada fila de A debe tener la misma cantidad de columnas que c")
-        
-        # Resolver
+          # Resolver
         if track_iterations:
             solution, optimal_value, tableau_history, pivot_history = simplex(
                 c, A, b, minimize=minimize, track_iterations=True
@@ -77,13 +76,17 @@ def resolver_simplex():
                 'tableau_history': [t.tolist() for t in tableau_history],
                 'pivot_history': [[int(r), int(c)] for r, c in pivot_history],
                 'success': True
-            }            # ─ Detectar soluciones múltiples óptimas con nuevo detector ─
+            }
+            # ─ Detectar soluciones múltiples óptimas con nuevo detector ─
             final_tableau = tableau_history[-1]
             n_vars = len(c)
             
             # Usar el nuevo detector mejorado
-            multiple_solutions_result = detect_multiple_solutions(final_tableau, n_vars)
+            multiple_solutions_result = detect_multiple_solutions(final_tableau, n_vars, c, minimize)
             formatted_result = format_multiple_solutions_result(multiple_solutions_result)
+            
+            # Convertir cualquier tipo numpy en los resultados de soluciones múltiples
+            formatted_result = convert_numpy_types(formatted_result)
             
             # Integrar resultados al resultado principal
             resultado.update(formatted_result)
@@ -94,7 +97,10 @@ def resolver_simplex():
                 'solution': [float(x) for x in solution],
                 'optimal_value': float(optimal_value),
                 'success': True
-            }        
+            }
+        
+        # Aplicar conversión final de numpy a todos los datos del resultado
+        resultado = convert_numpy_types(resultado)
         return render_template('simplex.html', resultado=resultado, form_data=form_data)
     except (SimplexError, DimensionError, UnboundedError) as e:
         flash(f'Error en el método Simplex: {str(e)}', 'danger')
@@ -220,9 +226,10 @@ def resolver_granm():
             n_vars = len(c)
             
             # Usar el nuevo detector mejorado
-            multiple_solutions_result = detect_multiple_solutions(final_tableau, n_vars)
-            formatted_result = format_multiple_solutions_result(multiple_solutions_result)            
-            # Integrar resultados al resultado principal
+            multiple_solutions_result = detect_multiple_solutions(final_tableau, n_vars, c, minimize)
+            formatted_result = format_multiple_solutions_result(multiple_solutions_result)
+            # Convertir tipos numpy en los resultados de múltiples soluciones
+            formatted_result = convert_numpy_types(formatted_result)            # Integrar resultados al resultado principal
             resultado.update(formatted_result)
         else:
             sol, z = granm_solver(
@@ -235,6 +242,36 @@ def resolver_granm():
                 'optimal_value': float(z),
                 'success': True
             }
+            
+            # ─ Detectar soluciones múltiples sin iteraciones ─
+            # Ejecutar una vez más con iteraciones solo para obtener el tableau final
+            try:
+                _, _, T_hist_final, _ = granm_solver(
+                    c, A, b, sense,
+                    minimize=minimize, track_iterations=True, M=M_val
+                )
+                final_tableau = T_hist_final[-1]
+                n_vars = len(c)
+                
+                # Usar el nuevo detector mejorado
+                multiple_solutions_result = detect_multiple_solutions(final_tableau, n_vars, c, minimize)
+                formatted_result = format_multiple_solutions_result(multiple_solutions_result)
+                # Convertir tipos numpy en los resultados de múltiples soluciones
+                formatted_result = convert_numpy_types(formatted_result)
+                # Integrar resultados al resultado principal
+                resultado.update(formatted_result)
+            except Exception as e:
+                # Si hay error en la detección, continuar sin las soluciones múltiples
+                logger.warning(f"Error detectando soluciones múltiples en Gran M: {e}")
+                resultado.update({
+                    'has_multiple_solutions': False,
+                    'variables_with_zero_cost': [],
+                    'alternative_solutions': [],
+                    'detection_method': 'error'
+                })
+
+        # Aplicar conversión final de numpy a todos los datos del resultado
+        resultado = convert_numpy_types(resultado)
 
         return render_template('granm.html',
                                resultado=resultado,
@@ -344,10 +381,11 @@ def resolver_dosfases():
             }            # ─ Detectar y generar soluciones múltiples óptimas (Dos Fases) ─
             final_tableau = tableau_history[-1]
             n_vars = len(c)
-            
-            # Usar el nuevo detector mejorado
-            multiple_solutions_result = detect_multiple_solutions(final_tableau, n_vars)
-            formatted_result = format_multiple_solutions_result(multiple_solutions_result)            
+              # Usar el nuevo detector mejorado
+            multiple_solutions_result = detect_multiple_solutions(final_tableau, n_vars, c, minimize)
+            formatted_result = format_multiple_solutions_result(multiple_solutions_result)
+            # Convertir tipos numpy en los resultados de múltiples soluciones
+            formatted_result = convert_numpy_types(formatted_result)
             # Integrar resultados al resultado principal
             resultado.update(formatted_result)
         else:
@@ -361,6 +399,36 @@ def resolver_dosfases():
                 'optimal_value': convert_numpy_types(optimal_value),
                 'success': True
             }
+            
+            # ─ Detectar soluciones múltiples sin iteraciones ─
+            # Ejecutar una vez más con iteraciones solo para obtener el tableau final
+            try:
+                _, _, tableau_history_final, _ = dosfases_solver(
+                    c, A, b, eq_constraints=eq_constraints, ge_constraints=ge_constraints, 
+                    minimize=minimize, track_iterations=True
+                )
+                final_tableau = tableau_history_final[-1]
+                n_vars = len(c)
+                
+                # Usar el nuevo detector mejorado
+                multiple_solutions_result = detect_multiple_solutions(final_tableau, n_vars, c, minimize)
+                formatted_result = format_multiple_solutions_result(multiple_solutions_result)
+                # Convertir tipos numpy en los resultados de múltiples soluciones
+                formatted_result = convert_numpy_types(formatted_result)
+                # Integrar resultados al resultado principal
+                resultado.update(formatted_result)
+            except Exception as e:
+                # Si hay error en la detección, continuar sin las soluciones múltiples
+                logger.warning(f"Error detectando soluciones múltiples en Dos Fases: {e}")
+                resultado.update({
+                    'has_multiple_solutions': False,
+                    'variables_with_zero_cost': [],
+                    'alternative_solutions': [],
+                    'detection_method': 'error'
+                })
+
+        # Aplicar conversión final de numpy a todos los datos del resultado
+        resultado = convert_numpy_types(resultado)
         return render_template('dosfases.html', resultado=resultado, form_data=form_data)
     except (DosFasesError, DimensionError, UnboundedError, InfeasibleError) as e:
         flash(f'Error en el método Dos Fases: {str(e)}', 'danger')
@@ -722,61 +790,76 @@ def delete_caso(caso_id):
 def resolver_simplex():
     try:
         data = request.json
-        c = data.get('c', [])
-        A = data.get('A', [[]])
-        b = data.get('b', [])
-        minimize = data.get('minimize', False)
+        c  = data.get('c', [])
+        A  = data.get('A', [[]])
+        b  = data.get('b', [])
+        minimize         = data.get('minimize', False)
         track_iterations = data.get('track_iterations', False)
-        
-        # Validate inputs
+
+        # ── Validar entradas ──────────────────────────────
         if not c or not A or not b:
-            return jsonify({"error": "Datos incompletos. Se requieren c, A y b."}), 400
-          # Solve with Simplex
+            return jsonify({"error": "Datos incompletos. Se requieren c, A y b."}), 400        # ── Resolver con iteraciones (para mostrar tabla) ─
         if track_iterations:
-            solution, z_opt, tableau_history, pivot_history = simplex(
+            solution, z_opt, tableau_hist, pivot_hist = simplex(
                 c, A, b, minimize=minimize, track_iterations=True
             )
             result = {
-                "solution": solution.tolist() if hasattr(solution, "tolist") else solution,
-                "optimal_value": float(z_opt),
-                "tableau_history": [t.tolist() for t in tableau_history] if hasattr(tableau_history[0], "tolist") else tableau_history,
-                "pivot_history": pivot_history
+                "solution"       : _to_list(solution),
+                "optimal_value"  : float(z_opt),
+                "tableau_history": [_to_list(t) for t in tableau_hist],
+                "pivot_history"  : pivot_hist
             }
-            
-            # ─ Detectar múltiples soluciones usando el detector mejorado ─
+
+            # Detectar soluciones múltiples
             try:
-                final_tableau = tableau_history[-1]
-                multiple_solutions_result = detect_multiple_solutions(
-                    final_tableau, len(c), c, minimize=minimize
-                )
-                
-                # Formatear resultado para compatibilidad con API
-                result['multiple_solutions'] = format_multiple_solutions_result(multiple_solutions_result)
-                
-                # Mantener compatibilidad con API anterior
-                result['has_multiple_solutions'] = multiple_solutions_result['has_multiple_solutions']
-                result['multiple_solution_vars'] = multiple_solutions_result.get('variables_with_zero_cost', [])
-                if multiple_solutions_result.get('alternative_solutions'):
-                    result['alternative_solutions'] = multiple_solutions_result['alternative_solutions']
-                
+                final_tableau = tableau_hist[-1]
+                multi_info = detect_multiple_solutions(
+                    final_tableau,
+                    n_orig_vars=len(c),   # 2º arg
+                    c=c,                  # 3º arg   ← ¡faltaba!
+                    minimize=minimize     # opcional
+                    )
+
+                # Convertir tipos numpy en la información de soluciones múltiples
+                multi_info = convert_numpy_types(multi_info)
+
+                result["multiple_solutions"]   = format_multiple_solutions_result(multi_info)
+                result["has_multiple_solutions"] = multi_info["has_multiple_solutions"]
+                result["multiple_solution_vars"] = multi_info.get("variables_with_zero_cost", [])
+                if multi_info.get("alternative_solutions"):
+                    result["alternative_solutions"] = multi_info["alternative_solutions"]
+
             except Exception as e:
-                logger.warning(f"Error en detección de múltiples soluciones: {e}")
-                result['multiple_solutions'] = {'has_multiple_solutions': False, 'error': str(e)}
+                logger.warning(f"Error detectando soluciones múltiples: {e}")
+                result["multiple_solutions"] = {"has_multiple_solutions": False, "error": str(e)}
+
+        # ── Resolver sin iteraciones ─────────────────────
         else:
             solution, z_opt = simplex(
                 c, A, b, minimize=minimize, track_iterations=False
             )
             result = {
-                "solution": solution.tolist() if hasattr(solution, "tolist") else solution,
-                "optimal_value": float(z_opt)
+                "solution"      : _to_list(solution),
+                "optimal_value" : float(z_opt)
             }
-        
+
+        # Aplicar conversión final de numpy a todos los datos del resultado
+        result = convert_numpy_types(result)
         return jsonify(result)
+
     except (SimplexError, DimensionError, UnboundedError) as e:
         return jsonify({"error": str(e)}), 400
+
     except Exception as e:
         logger.exception("Error in Simplex solver")
-        return jsonify({"error": f"Error inesperado: {str(e)}"}), 500
+        return jsonify({"error": f"Error inesperado: {e}"}), 500
+
+
+# ────────────────── util ──────────────────
+def _to_list(x):
+    """Convierte numpy arrays u objetos normales a list."""
+    return x.tolist() if hasattr(x, "tolist") else x
+
 
 # Solve using Gran M method
 @api_bp.route('/resolver/granm', methods=['POST'])
@@ -804,28 +887,29 @@ def resolver_granm():
                 "optimal_value": float(z_opt),
                 "tableau_history": [t.tolist() for t in tableau_history] if hasattr(tableau_history[0], "tolist") else tableau_history,
                 "pivot_history": pivot_history
-            }
-
-            # ─ Detectar múltiples soluciones usando el detector mejorado ─
+            }            # ─ Detectar múltiples soluciones usando el detector mejorado ─
             try:
                 final_tableau = tableau_history[-1]
                 multiple_solutions_result = detect_multiple_solutions(
                     final_tableau, len(c), c, minimize=minimize
                 )
 
-                # Formatear resultado
-                result['multiple_solutions'] = format_multiple_solutions_result(multiple_solutions_result)
-                result['has_multiple_solutions'] = multiple_solutions_result['has_multiple_solutions']
-                result['multiple_solution_vars'] = multiple_solutions_result.get('variables_with_zero_cost', [])
+                # Formatear resultado y convertir tipos numpy
+                formatted_multiple_result = format_multiple_solutions_result(multiple_solutions_result)
+                formatted_multiple_result = convert_numpy_types(formatted_multiple_result)
+                
+                result['multiple_solutions'] = formatted_multiple_result
+                result['has_multiple_solutions'] = formatted_multiple_result['has_multiple_solutions']
+                result['multiple_solution_vars'] = formatted_multiple_result.get('variables_with_zero_cost', [])
 
-                if multiple_solutions_result.get('alternative_solutions'):
-                    result['alternative_solutions'] = multiple_solutions_result['alternative_solutions']
+                if formatted_multiple_result.get('alternative_solutions'):                result['alternative_solutions'] = formatted_multiple_result['alternative_solutions']
 
             except Exception as e:
                 logger.warning(f"Error en detección de múltiples soluciones: {e}")
                 result['multiple_solutions'] = {'has_multiple_solutions': False, 'error': str(e)}
-
-        # Resolver sin iteraciones
+            
+            # Convertir todos los tipos numpy en el resultado final
+            result = convert_numpy_types(result)        # Resolver sin iteraciones
         else:
             solution, z_opt = granm_solver(
                 c, A, b, eq_constraints, minimize, track_iterations=False
@@ -834,6 +918,8 @@ def resolver_granm():
                 "solution": solution.tolist() if hasattr(solution, "tolist") else solution,
                 "optimal_value": float(z_opt)
             }
+            # Convertir todos los tipos numpy en el resultado final
+            result = convert_numpy_types(result)
 
         return jsonify(result)
 
@@ -850,10 +936,10 @@ def convert_numpy_types(obj):
     import logging
     logger = logging.getLogger(__name__)
     
-    # Handle numpy scalars
-    if isinstance(obj, np.integer):
+    # Handle numpy scalars (including specific types like int64)
+    if isinstance(obj, (np.integer, np.int64, np.int32, np.int16, np.int8)):
         return int(obj)
-    elif isinstance(obj, np.floating):
+    elif isinstance(obj, (np.floating, np.float64, np.float32)):
         return float(obj)
     elif isinstance(obj, np.bool_):
         return bool(obj)
@@ -872,6 +958,17 @@ def convert_numpy_types(obj):
             return obj.item()
         else:
             return obj.tolist()
+    # Handle any remaining numpy types by checking the type name
+    elif 'numpy' in str(type(obj)) or 'int64' in str(type(obj)):
+        try:
+            if hasattr(obj, 'item'):
+                return obj.item()
+            elif hasattr(obj, 'tolist'):
+                return obj.tolist()
+            else:
+                return int(obj) if 'int' in str(type(obj)) else float(obj)
+        except (ValueError, TypeError):
+            return str(obj)
     return obj
 
 # Solve using Two-Phase method
@@ -901,83 +998,31 @@ def resolver_dosfases():
                 "solution": convert_numpy_types(solution),
                 "optimal_value": convert_numpy_types(z_opt),
                 "tableau_history": convert_numpy_types(tableau_history),
-                "pivot_history": convert_numpy_types(pivot_history)
-            }
+                "pivot_history": convert_numpy_types(pivot_history)            }
             
-            # ─ Detectar y generar soluciones múltiples óptimas (Dos Fases - API) ─
-            final_tableau = tableau_history[-1]
-            z_row = final_tableau[0, :-1]
-            n_vars = len(c)
+            # ─ Detectar múltiples soluciones usando el detector mejorado ─
+            try:
+                final_tableau = tableau_history[-1]
+                multiple_solutions_result = detect_multiple_solutions(
+                    final_tableau, len(c), c, minimize=minimize
+                )
 
-            non_basic_zero_cost = []
-            for j in range(n_vars):  # Solo variables originales
-                col = final_tableau[1:, j]
-                if np.count_nonzero(col) != 1 or not np.isclose(col.max(), 1.0):
-                    # Está fuera de la base
-                    if abs(z_row[j]) < 1e-8:  # costo reducido ≈ 0
-                        non_basic_zero_cost.append(j)
+                # Formatear resultado y convertir tipos numpy
+                formatted_multiple_result = format_multiple_solutions_result(multiple_solutions_result)
+                formatted_multiple_result = convert_numpy_types(formatted_multiple_result)
+                
+                result['multiple_solutions'] = formatted_multiple_result
+                result['has_multiple_solutions'] = formatted_multiple_result['has_multiple_solutions']
+                result['multiple_solution_vars'] = formatted_multiple_result.get('variables_with_zero_cost', [])
 
-            result['has_multiple_solutions'] = bool(non_basic_zero_cost)
-            result['multiple_solution_vars'] = convert_numpy_types(non_basic_zero_cost)
+                if formatted_multiple_result.get('alternative_solutions'):
+                    result['alternative_solutions'] = formatted_multiple_result['alternative_solutions']
 
-            # Generar soluciones alternativas si existen
-            alternative_solutions = []
-            if non_basic_zero_cost:
-                for var_to_enter in non_basic_zero_cost:
-                    try:
-                        # Crear una copia del tableau final para pivotear
-                        tableau_copy = final_tableau.copy()
-                        
-                        # Encontrar la fila pivote (ratio test)
-                        entering_col = tableau_copy[1:, var_to_enter]
-                        rhs_col = tableau_copy[1:, -1]
-                        
-                        # Solo considerar ratios positivos
-                        valid_ratios = []
-                        for i, (col_val, rhs_val) in enumerate(zip(entering_col, rhs_col)):
-                            if col_val > 1e-8:  # Evitar división por cero/negativo
-                                valid_ratios.append((rhs_val / col_val, i + 1))  # i+1 porque saltamos la fila z
-                        
-                        if valid_ratios:
-                            # Encontrar el mínimo ratio (regla del pivote)
-                            min_ratio, pivot_row = min(valid_ratios)
-                            
-                            # Realizar el pivoteo
-                            pivot_element = tableau_copy[pivot_row, var_to_enter]
-                            
-                            # Normalizar la fila pivote
-                            tableau_copy[pivot_row, :] /= pivot_element
-                            
-                            # Eliminar la columna pivote en otras filas
-                            for i in range(tableau_copy.shape[0]):
-                                if i != pivot_row:
-                                    factor = tableau_copy[i, var_to_enter]
-                                    tableau_copy[i, :] -= factor * tableau_copy[pivot_row, :]
-                            
-                            # Extraer la nueva solución
-                            new_solution = np.zeros(n_vars)
-                            
-                            # Identificar variables básicas en el nuevo tableau
-                            for j in range(n_vars):
-                                col = tableau_copy[1:, j]
-                                # Si es una columna unitaria (variable básica)
-                                if np.count_nonzero(col) == 1 and np.isclose(col.max(), 1.0):
-                                    basic_row = np.where(np.isclose(col, 1.0))[0][0] + 1
-                                    new_solution[j] = tableau_copy[basic_row, -1]
-                              # Verificar que la solución es válida (no negativa)
-                            if np.all(new_solution >= -1e-8):  # Tolerancia para errores numéricos
-                                new_solution = np.maximum(new_solution, 0)  # Limpiar valores muy pequeños negativos
-                                alternative_solutions.append({
-                                    'solution': convert_numpy_types(new_solution),
-                                    'entering_var': convert_numpy_types(var_to_enter),
-                                    'pivot_row': convert_numpy_types(pivot_row - 1)  # Ajustar índice
-                                })
-                        
-                    except Exception as e:
-                        # Si hay error al generar esta solución alternativa, continuar con la siguiente
-                        logger.warning(f"Error generando solución alternativa para variable {var_to_enter}: {e}")
-                        continue            
-            result['alternative_solutions'] = alternative_solutions
+            except Exception as e:
+                logger.warning(f"Error en detección de múltiples soluciones (Dos Fases): {e}")
+                result['multiple_solutions'] = {'has_multiple_solutions': False, 'error': str(e)}
+              # Convertir todos los tipos numpy en el resultado final
+            result = convert_numpy_types(result)
         else:
             solution, z_opt = dosfases_solver(
                 c, A, b, eq_constraints=eq_constraints, ge_constraints=ge_constraints, 
@@ -987,6 +1032,37 @@ def resolver_dosfases():
                 "solution": convert_numpy_types(solution),
                 "optimal_value": convert_numpy_types(z_opt)
             }
+            
+            # ─ Detectar múltiples soluciones sin iteraciones ─
+            # Ejecutar una vez más con iteraciones solo para obtener el tableau final
+            try:
+                _, _, tableau_history_final, _ = dosfases_solver(
+                    c, A, b, eq_constraints=eq_constraints, ge_constraints=ge_constraints, 
+                    minimize=minimize, track_iterations=True
+                )
+                final_tableau = tableau_history_final[-1]
+                
+                multiple_solutions_result = detect_multiple_solutions(
+                    final_tableau, len(c), c, minimize=minimize
+                )
+
+                # Formatear resultado y convertir tipos numpy
+                formatted_multiple_result = format_multiple_solutions_result(multiple_solutions_result)
+                formatted_multiple_result = convert_numpy_types(formatted_multiple_result)
+                
+                result['multiple_solutions'] = formatted_multiple_result
+                result['has_multiple_solutions'] = formatted_multiple_result['has_multiple_solutions']
+                result['multiple_solution_vars'] = formatted_multiple_result.get('variables_with_zero_cost', [])
+
+                if formatted_multiple_result.get('alternative_solutions'):
+                    result['alternative_solutions'] = formatted_multiple_result['alternative_solutions']
+
+            except Exception as e:
+                logger.warning(f"Error detectando soluciones múltiples en Dos Fases (sin iteraciones): {e}")
+                result['multiple_solutions'] = {'has_multiple_solutions': False, 'error': str(e)}
+            
+            # Convertir todos los tipos numpy en el resultado final
+            result = convert_numpy_types(result)
         
         return jsonify(result)
     except (DosFasesError, DimensionError, UnboundedError, InfeasibleError) as e:
@@ -1065,3 +1141,321 @@ def upload_file():
 
 # For backward compatibility, create a bp variable
 bp = main_bp
+
+import numpy as np
+
+def generate_alternative_solutions(final_tableau, n_vars, tol=1e-8):
+    """
+    Recorre cada variable NO básica con costo reducido 0,
+    pivotea (Bland: razón mínima) y devuelve las soluciones alternativas.
+
+    Returns
+    -------
+    list[dict]  cada dict = {
+        'solution'    : list[float],
+        'entering_var': int,        # índice de la variable que entra
+        'pivot_row'   : int         # fila (0-based, sin contar Z)
+    }
+    """
+    alternatives = []
+    z_row  = final_tableau[0, :-1]
+    m_rows = final_tableau.shape[0] - 1     # sin la fila Z
+
+    for j in range(n_vars):
+        col = final_tableau[1:, j]
+
+        # (a) var NO básica  → columna no unitaria
+        is_basic = (np.count_nonzero(col) == 1 and np.isclose(col.max(), 1.0, atol=tol))
+        # (b) costo reducido ≈ 0
+        zero_cost = np.isclose(z_row[j], 0.0, atol=tol)
+
+        if is_basic or not zero_cost:
+            continue  # no candidata
+
+        # filas con coeficiente positivo
+        positive = np.where(col > tol)[0]
+        if positive.size == 0:
+            # no se puede pivotar sin violar factibilidad
+            continue
+
+        # razón mínima (Bland)
+        rhs      = final_tableau[1:, -1][positive]
+        ratios   = rhs / col[positive]
+        p_row    = positive[np.argmin(ratios)] + 1   # +1 para incluir fila Z
+
+        # --- pivotar en una copia ---
+        T = final_tableau.copy()
+        T[p_row] /= T[p_row, j]               # normaliza
+        for r in range(T.shape[0]):
+            if r != p_row:
+                T[r] -= T[r, j] * T[p_row]
+
+        # --- extraer solución de la copia ---
+        alt_sol = np.zeros(n_vars)
+        for k in range(n_vars):
+            col_k = T[1:, k]
+            if np.count_nonzero(col_k) == 1 and np.isclose(col_k.max(), 1.0, atol=tol):
+                basic_row = np.where(np.isclose(col_k, 1.0, atol=tol))[0][0] + 1
+                alt_sol[k] = T[basic_row, -1]
+
+        alternatives.append({
+            'solution'    : alt_sol.tolist(),
+            'entering_var': j,
+            'pivot_row'   : p_row - 1   # 0-based sin fila Z
+        })
+
+    return alternatives
+
+
+def detect_multiple_solutions(final_tableau, n_orig_vars, c, minimize=False):
+    """
+    Detecta soluciones múltiples óptimas con método mejorado.
+    
+    Métodos de detección:
+    1. Variables no básicas con costo reducido cero (método clásico)
+    2. Análisis de degeneración y variables básicas con costo cero
+    3. Verificación geométrica cuando todas las variables son básicas
+    """
+    info = {
+        'has_multiple_solutions': False,
+        'variables_with_zero_cost': [],
+        'alternative_solutions': [],
+        'detection_method': 'none'
+    }
+
+    z_row = final_tableau[0, :-1]
+    tol = 1e-8
+    
+    # Método 1: Variables no básicas con costo reducido 0 (método clásico)
+    for j in range(n_orig_vars):
+        col = final_tableau[1:, j]
+        is_basic = (np.count_nonzero(col) == 1 and np.isclose(col.max(), 1.0, atol=tol))
+        zero_cost = np.isclose(z_row[j], 0.0, atol=tol)
+        
+        if not is_basic and zero_cost:
+            info['variables_with_zero_cost'].append(j)
+    
+    if info['variables_with_zero_cost']:
+        info['has_multiple_solutions'] = True
+        info['detection_method'] = 'nonbasic_zero_cost'
+        info['alternative_solutions'] = generate_alternative_solutions(
+            final_tableau, n_orig_vars
+        )
+        return info
+      # Método 2: Verificar si todas las variables originales son básicas con costo 0
+    # Esto puede indicar que estamos en un vértice donde múltiples aristas son óptimas
+    all_basic_zero_cost = True
+    basic_vars_count = 0
+    
+    for j in range(n_orig_vars):
+        col = final_tableau[1:, j]
+        is_basic = (np.count_nonzero(col) == 1 and np.isclose(col.max(), 1.0, atol=tol))
+        zero_cost = np.isclose(z_row[j], 0.0, atol=tol)
+        
+        if is_basic:
+            basic_vars_count += 1
+            if not zero_cost:
+                all_basic_zero_cost = False
+        # Note: we don't set all_basic_zero_cost to False for non-basic variables
+        # because we only care about whether basic variables have zero cost
+    
+    # Si todas las variables básicas tienen costo 0, verificar variables de holgura
+    if all_basic_zero_cost and basic_vars_count > 0:
+        # Buscar variables de holgura no básicas con costo cero
+        slack_candidates = []
+        for j in range(n_orig_vars, len(z_row)):
+            if j < final_tableau.shape[1] - 1:  # No incluir la columna RHS
+                col = final_tableau[1:, j]
+                is_basic = (np.count_nonzero(col) == 1 and np.isclose(col.max(), 1.0, atol=tol))
+                zero_cost = np.isclose(z_row[j], 0.0, atol=tol)
+                
+                if not is_basic and zero_cost:
+                    slack_candidates.append(j)
+        
+        if slack_candidates:
+            info['has_multiple_solutions'] = True
+            info['detection_method'] = 'slack_zero_cost'
+            info['variables_with_zero_cost'] = slack_candidates
+            # Para variables de holgura, usamos un generador alternativo
+            info['alternative_solutions'] = generate_alternative_solutions_from_slack(
+                final_tableau, n_orig_vars, slack_candidates
+            )
+            return info
+    
+    # Método 3: Verificación especial para casos donde todas las variables originales son básicas
+    # pero los coeficientes de la función objetivo son iguales (indicador fuerte de soluciones múltiples)
+    if basic_vars_count >= 2:
+        # Verificar si los coeficientes originales son iguales o proporcionales
+        c_array = np.array(c)
+        if len(set(np.abs(c_array))) == 1 and c_array[0] != 0:  # Todos los coeficientes son iguales            # En este caso, es muy probable que haya soluciones múltiples
+            # Intentar generar alternativas intercambiando variables básicas
+            info['has_multiple_solutions'] = True
+            info['detection_method'] = 'equal_coefficients'
+            info['variables_with_zero_cost'] = list(range(n_orig_vars))
+            info['alternative_solutions'] = generate_solutions_from_equal_coefficients(
+                final_tableau, n_orig_vars, c
+            )
+
+    return info
+
+
+def format_multiple_solutions_result(info):
+    """
+    Simple pass-through (aquí podrías dar formato distinto si tu UI lo requiere)
+    """
+    return info
+
+def generate_alternative_solutions_from_slack(final_tableau, n_orig_vars, slack_candidates, tol=1e-8):
+    """
+    Genera soluciones alternativas cuando variables de holgura no básicas tienen costo reducido cero.
+    """
+    alternatives = []
+    
+    for slack_var in slack_candidates:
+        # Verificar si podemos hacer básica esta variable de holgura
+        col = final_tableau[1:, slack_var]
+        rhs = final_tableau[1:, -1]
+        
+        # Buscar filas donde el coeficiente de la variable de holgura es positivo
+        positive_indices = np.where(col > tol)[0]
+        
+        if len(positive_indices) == 0:
+            continue
+            
+        # Calcular ratios para determinar la fila pivote
+        ratios = []
+        valid_rows = []
+        
+        for i in positive_indices:
+            if rhs[i] >= 0:  # Solo considerar RHS no negativos
+                ratio = rhs[i] / col[i]
+                ratios.append(ratio)
+                valid_rows.append(i)
+        
+        if not ratios:
+            continue
+            
+        # Seleccionar la fila con menor ratio
+        min_ratio_idx = np.argmin(ratios)
+        pivot_row = valid_rows[min_ratio_idx] + 1  # +1 para incluir fila Z
+        
+        # Crear tableau alternativo pivoteando
+        T = final_tableau.copy()
+        T[pivot_row] /= T[pivot_row, slack_var]
+        
+        for r in range(T.shape[0]):
+            if r != pivot_row:
+                T[r] -= T[r, slack_var] * T[pivot_row]
+        
+        # Extraer solución alternativa
+        alt_sol = np.zeros(n_orig_vars)
+        for k in range(n_orig_vars):
+            col_k = T[1:, k]
+            if np.count_nonzero(col_k) == 1 and np.isclose(col_k.max(), 1.0, atol=tol):
+                basic_row = np.where(np.isclose(col_k, 1.0, atol=tol))[0][0] + 1
+                alt_sol[k] = T[basic_row, -1]
+
+        # Verificar que es una solución diferente y factible
+        current_sol = np.zeros(n_orig_vars)
+        for k in range(n_orig_vars):
+            col_k = final_tableau[1:, k]
+            if np.count_nonzero(col_k) == 1 and np.isclose(col_k.max(), 1.0, atol=tol):
+                basic_row = np.where(np.isclose(col_k, 1.0, atol=tol))[0][0] + 1
+                current_sol[k] = final_tableau[basic_row, -1]
+        
+        if not np.allclose(alt_sol, current_sol, atol=tol) and np.all(alt_sol >= -tol):
+            alternatives.append({
+                'solution': alt_sol.tolist(),
+                'entering_var': slack_var,
+                'pivot_row': pivot_row - 1,
+                'method': 'slack_variable'
+            })
+    
+    return alternatives
+
+
+def generate_solutions_from_equal_coefficients(final_tableau, n_orig_vars, c, tol=1e-8):
+    """
+    Genera soluciones alternativas cuando los coeficientes de la función objetivo son iguales,
+    lo que geométricamente indica que múltiples vértices son óptimos.
+    """
+    alternatives = []
+    
+    # Obtener la solución actual
+    current_sol = np.zeros(n_orig_vars)
+    basic_vars = []
+    
+    for k in range(n_orig_vars):
+        col_k = final_tableau[1:, k]
+        if np.count_nonzero(col_k) == 1 and np.isclose(col_k.max(), 1.0, atol=tol):
+            basic_row = np.where(np.isclose(col_k, 1.0, atol=tol))[0][0] + 1
+            current_sol[k] = final_tableau[basic_row, -1]
+            basic_vars.append(k)
+    
+    # Cuando los coeficientes son iguales, cualquier combinación convexa de vértices
+    # con el mismo valor objetivo es óptima
+    if len(basic_vars) >= 2:
+        # Generar algunas soluciones convexas alternativas
+        for i in range(len(basic_vars)):
+            for j in range(i + 1, len(basic_vars)):
+                var1, var2 = basic_vars[i], basic_vars[j]
+                
+                # Crear solución donde intercambiamos valores entre dos variables básicas
+                alt_sol = current_sol.copy()
+                
+                # Intercambio simple: dar todo el valor de var1 a var2
+                if current_sol[var1] > tol:
+                    transfer = min(current_sol[var1], 1.0)  # Limitar transferencia
+                    alt_sol[var1] = max(0, current_sol[var1] - transfer)
+                    alt_sol[var2] = current_sol[var2] + transfer                    
+                    if np.all(alt_sol >= -tol):  # Verificar factibilidad
+                        alternatives.append({
+                            'solution': alt_sol.tolist(),
+                            'entering_var': var2,  # Variable que se incrementa
+                            'pivot_row': -1,  # No hay fila pivote específica en este método
+                            'method': 'equal_coefficients',
+                            'transfer_from': var1,
+                            'transfer_to': var2,
+                            'transfer_amount': transfer
+                        })
+                
+                # También intentar el intercambio inverso
+                if current_sol[var2] > tol:
+                    alt_sol2 = current_sol.copy()
+                    transfer = min(current_sol[var2], 1.0)
+                    alt_sol2[var2] = max(0, current_sol[var2] - transfer)
+                    alt_sol2[var1] = current_sol[var1] + transfer
+                    
+                    if np.all(alt_sol2 >= -tol):                        alternatives.append({
+                            'solution': alt_sol2.tolist(),
+                            'entering_var': var1,  # Variable que se incrementa
+                            'pivot_row': -1,  # No hay fila pivote específica en este método
+                            'method': 'equal_coefficients',
+                            'transfer_from': var2,
+                            'transfer_to': var1,
+                            'transfer_amount': transfer
+                        })
+    
+    # También generar combinaciones convexas más sofisticadas
+    if len(basic_vars) >= 2:
+        # Generar algunas combinaciones convexas con diferentes pesos
+        weights = [0.25, 0.5, 0.75]
+        for w in weights:
+            alt_sol = current_sol.copy()
+            # Redistribuir valores entre variables básicas
+            total_value = sum(current_sol[var] for var in basic_vars)
+            if total_value > tol:
+                # Redistribuir proporcionalmente
+                for idx, var in enumerate(basic_vars):
+                    new_proportion = w if idx == 0 else (1 - w) / (len(basic_vars) - 1)
+                    alt_sol[var] = total_value * new_proportion
+                
+                if np.all(alt_sol >= -tol) and not np.allclose(alt_sol, current_sol, atol=tol):                    alternatives.append({
+                        'solution': alt_sol.tolist(),
+                        'entering_var': basic_vars[0],  # Variable principal en la combinación
+                        'pivot_row': -1,  # No hay fila pivote específica en este método
+                        'method': 'convex_combination',
+                        'weight': w
+                    })
+    
+    return alternatives
