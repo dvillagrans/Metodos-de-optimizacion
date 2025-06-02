@@ -1450,7 +1450,8 @@ def generate_solutions_from_equal_coefficients(final_tableau, n_orig_vars, c, to
                     new_proportion = w if idx == 0 else (1 - w) / (len(basic_vars) - 1)
                     alt_sol[var] = total_value * new_proportion
                 
-                if np.all(alt_sol >= -tol) and not np.allclose(alt_sol, current_sol, atol=tol):                    alternatives.append({
+                if np.all(alt_sol >= -tol) and not np.allclose(alt_sol, current_sol, atol=tol):                    
+                    alternatives.append({
                         'solution': alt_sol.tolist(),
                         'entering_var': basic_vars[0],  # Variable principal en la combinación
                         'pivot_row': -1,  # No hay fila pivote específica en este método
