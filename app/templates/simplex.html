@@ -20,25 +20,27 @@
                 </h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('main.resolver_simplex') }}"> <!-- Botones de ejemplo -->
-                    <div class="mb-3" id="ejemplos-section-unique">
+                <form method="POST" action="{{ url_for('main.resolver_simplex') }}" id="simplexForm">
+                    <!-- Botones de ejemplo -->
+                    <div class="mb-3">
                         <label class="form-label fw-bold">
                             <i class="fas fa-star text-warning me-1"></i>Ejemplos Rápidos:
                         </label>
                         <div class="d-flex flex-wrap gap-2 mb-2">
                             <button type="button" class="btn btn-outline-secondary btn-sm"
-                                onclick="loadExample('simplex', 0)" title="Maximizar: 5x₁ + 7x₂">
+                                onclick="loadExample('simplex', 0)">
                                 <i class="fas fa-lightbulb me-1"></i>Ejemplo 1 - Producción
                             </button>
                             <button type="button" class="btn btn-outline-secondary btn-sm"
-                                onclick="loadExample('simplex', 1)" title="Maximizar: 3x₁ + 4x₂ + 6x₃">
+                                onclick="loadExample('simplex', 1)">
                                 <i class="fas fa-lightbulb me-1"></i>Ejemplo 2 - Transporte
-                            </button> <button type="button" class="btn btn-outline-secondary btn-sm"
-                                onclick="loadExample('simplex', 2)" title="Maximizar: 0.2x₁ + 0.3x₂ + 0.1x₃">
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="loadExample('simplex', 2)">
                                 <i class="fas fa-lightbulb me-1"></i>Ejemplo 3 - Inversión
                             </button>
                             <button type="button" class="btn btn-outline-warning btn-sm"
-                                onclick="loadExample('simplex', 3)" title="Problema no acotado">
+                                onclick="loadExample('simplex', 3)">
                                 <i class="fas fa-exclamation-triangle me-1"></i>Ejemplo 4 - No Acotado
                             </button>
                             <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearForm()">
@@ -46,63 +48,89 @@
                             </button>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="c" class="form-label">Función Objetivo (c):</label>
-                        <input type="text" class="form-control" id="c" name="c" placeholder="Ej: 3,2,1"
-                            value="{{ form_data.c if form_data else '' }}" required>
-                        <div class="form-text">Coeficientes separados por comas</div>
-                    </div>
 
-                    <div class="mb-3">
-                        <label for="A" class="form-label">Matriz de Restricciones (A):</label>
-                        <textarea class="form-control" id="A" name="A" rows="4" placeholder="1,2,1&#10;2,1,3&#10;1,1,1"
-                            required>{{ form_data.A if form_data else '' }}</textarea>
-                        <div class="form-text">Una fila por línea, coeficientes separados por comas</div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="b" class="form-label">Vector de Recursos (b):</label>
-                        <input type="text" class="form-control" id="b" name="b" placeholder="Ej: 12,8,6"
-                            value="{{ form_data.b if form_data else '' }}" required>
-                        <div class="form-text">Valores separados por comas</div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-check mb-3">
-                                <input class="form-check-input" type="checkbox" id="minimize" name="minimize"
-                                    {{ 'checked' if form_data and form_data.minimize else '' }}>
-                                <label class="form-check-label" for="minimize">
-                                    Minimizar (por defecto se maximiza)
-                                </label>
+                    <!-- Función Objetivo -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-target me-1 text-primary"></i>Función Objetivo
+                        </label>
+                        <div class="card bg-light">
+                            <div class="card-body p-3">
+                                <div class="d-flex align-items-center mb-2">
+                                    <span class="me-2 fw-bold">Objetivo:</span>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="objective_type" id="maximize"
+                                            value="maximize" checked>
+                                        <label class="form-check-label" for="maximize">Maximizar</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="objective_type" id="minimize"
+                                            value="minimize">
+                                        <label class="form-check-label" for="minimize">Minimizar</label>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center mb-2">
+                                    <span class="me-2">Variables:</span>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-secondary"
+                                            onclick="changeVariableCount(2)">2 variables</button>
+                                        <button type="button" class="btn btn-outline-secondary active"
+                                            onclick="changeVariableCount(3)">3 variables</button>
+                                        <button type="button" class="btn btn-outline-secondary"
+                                            onclick="changeVariableCount(4)">4 variables</button>
+                                        <button type="button" class="btn btn-outline-secondary"
+                                            onclick="changeVariableCount(5)">5 variables</button>
+                                    </div>
+                                </div>
+                                <div id="objective-function" class="d-flex flex-wrap align-items-center gap-2">
+                                    <!-- Se generará dinámicamente -->
+                                </div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Restricciones -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label fw-bold mb-0">
+                                <i class="fas fa-list me-1 text-success"></i>Restricciones
+                            </label>
+                            <button type="button" class="btn btn-success btn-sm" onclick="addConstraint()">
+                                <i class="fas fa-plus me-1"></i>Agregar Restricción
+                            </button>
+                        </div>
+                        <div id="constraints-container">
+                            <!-- Se generarán dinámicamente -->
+                        </div>
+                    </div>
+
+                    <!-- Campos hidden para compatibilidad -->
+                    <input type="hidden" id="c" name="c">
+                    <input type="hidden" id="A" name="A">
+                    <input type="hidden" id="b" name="b">
+                    <input type="hidden" id="minimize_hidden" name="minimize">
+
+                    <!-- Opciones adicionales -->
+                    <div class="row mb-4">
                         <div class="col-md-6">
-                            <div class="form-check mb-3">
+                            <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="track_iterations"
-                                    name="track_iterations" {{ 'checked' if form_data and form_data.track_iterations
-                                    else '' }}>
+                                    name="track_iterations" checked>
                                 <label class="form-check-label" for="track_iterations">
-                                    Mostrar iteraciones
+                                    <i class="fas fa-history me-1"></i>Mostrar iteraciones del algoritmo
                                 </label>
                             </div>
                         </div>
-                    </div>
+                    </div> <!-- Botones de acción -->
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-6 mb-2">
                             <button type="submit" class="btn btn-primary w-100">
                                 <i class="fas fa-calculator me-2"></i>Resolver
                             </button>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <button type="submit" formaction="{{ url_for('main.generar_animacion_simplex') }}"
-                                class="btn btn-success w-100" id="animationButton">
-                                <span class="button-text">
-                                    <i class="fas fa-play me-2"></i>Resolver con Animación
-                                </span>
-                                <span class="button-loading d-none">
-                                    <i class="fas fa-spinner fa-spin me-2"></i>Generando animación...
-                                </span>
+                        <div class="col-md-6 mb-2">
+                            <button type="button" class="btn btn-outline-secondary w-100" onclick="clearForm()">
+                                <i class="fas fa-eraser me-2"></i>Limpiar
                             </button>
                         </div>
                     </div>
@@ -123,7 +151,9 @@
                     <h5 class="card-title">Resultado:</h5>
                     <p class="mb-2">
                         <strong>Valor óptimo:</strong> {{ "%.4f"|format(resultado.optimal_value) }}
-                    </p> {% if resultado.has_multiple_solutions %}
+                    </p>
+
+                    {% if resultado.has_multiple_solutions %}
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
                         <strong>⚠️ Este problema tiene soluciones óptimas múltiples.</strong>
@@ -243,133 +273,692 @@
                         {% endfor %}
                     </div>
                 </div>
-            </div> {% endif %}
-            {% endif %} {% if video_url or image_url %}
-            <div class="card mt-4">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="mb-0">
-                        {% if video_url %}
-                        <i class="fas fa-film me-2"></i>Animación del Proceso
-                        {% else %}
-                        <i class="fas fa-image me-2"></i>Visualización del Proceso
-                        {% endif %}
-                    </h5>
-                </div>
-                <div class="card-body text-center">
-                    {% if video_url %}
-                    <video width="100%" height="400" controls>
-                        <source src="{{ video_url }}" type="video/mp4">
-                        Tu navegador no soporta el elemento de video.
-                    </video>
-                    <p class="mt-2 text-muted">
-                        <i class="fas fa-info-circle me-1"></i>
-                        Animación generada mostrando el proceso de resolución paso a paso
-                    </p>
-                    {% elif image_url %}
-                    <img src="{{ image_url }}" alt="Visualización del proceso" class="img-fluid"
-                        style="max-height: 400px;">
-                    <p class="mt-2 text-muted">
-                        <i class="fas fa-info-circle me-1"></i>
-                        Visualización generada mostrando el proceso de resolución
-                    </p>
-                    {% endif %}
-                </div>
             </div>
+            {% endif %}
             {% endif %}
         </div>
         {% endif %}
     </div>
 </div>
 
+<!-- Cargar script de ejemplos -->
 <script src="{{ url_for('static', filename='js/examples.js') }}?v={{ range(100, 999) | random }}"></script>
-<style>
-    /* Ocultar cualquier sección duplicada de ejemplos */
-    .mb-3:not(#ejemplos-section-unique):has(.form-label:contains("Ejemplos Rápidos")) {
-        display: none !important;
-    }
-</style>
-<script>    // Eliminar duplicaciones si existen
-    document.addEventListener('DOMContentLoaded', function () {
-        const ejemplosSections = document.querySelectorAll('.mb-3');
-        let foundFirst = false;
 
-        ejemplosSections.forEach(function (section) {
-            const label = section.querySelector('.form-label');
-            if (label && label.textContent.includes('Ejemplos Rápidos')) {
-                if (!foundFirst) {
-                    foundFirst = true;
-                } else {
-                    section.style.display = 'none';
+<script>    // Variables globales
+    let variableCount = 3;
+    let constraintCount = 0;
+
+    // Función para cambiar el número de variables
+    function changeVariableCount(count) {
+        variableCount = count;
+
+        // Actualizar botones activos
+        document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+
+        updateObjectiveFunction();
+        updateAllConstraints();
+
+        // Guardar los cambios en localStorage
+        setTimeout(() => {
+            saveFormDataToLocalStorage();
+        }, 100);
+    }
+
+    // Función para agregar eventos de auto-guardado a elementos
+    function addAutoSaveEvents(container = document) {
+        const inputs = container.querySelectorAll('input, select');
+        inputs.forEach(input => {
+            input.addEventListener('input', debounce(saveFormDataToLocalStorage, 500));
+            input.addEventListener('change', saveFormDataToLocalStorage);
+        });
+    }
+
+    // Función debounce para evitar guardado excesivo
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // Función para actualizar la función objetivo
+    function updateObjectiveFunction() {
+        const container = document.getElementById('objective-function');
+        container.innerHTML = '';
+
+        for (let i = 0; i < variableCount; i++) {
+            if (i > 0) {
+                const plus = document.createElement('span');
+                plus.className = 'text-muted';
+                plus.textContent = '+';
+                container.appendChild(plus);
+            }
+
+            const group = document.createElement('div');
+            group.className = 'd-flex align-items-center';
+
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.step = '0.1';
+            input.className = 'form-control form-control-sm constraint-coef';
+            input.style.width = '70px';
+            input.id = `obj_coef_${i}`;
+            input.value = '1';
+
+            const label = document.createElement('span');
+            label.className = 'ms-1 fw-bold text-primary';
+            label.textContent = `x₍${i + 1}₎`;
+
+            group.appendChild(input);
+            group.appendChild(label);
+            container.appendChild(group);
+        }
+
+        // Agregar eventos de auto-guardado a los nuevos inputs
+        addAutoSaveEvents(container);
+    }    // Función para agregar nueva restricción
+    function addConstraint() {
+        const container = document.getElementById('constraints-container');
+        const constraintIndex = constraintCount;
+
+        const constraintDiv = document.createElement('div');
+        constraintDiv.className = 'card mb-2';
+        constraintDiv.id = `constraint_${constraintIndex}`;
+
+        let html = `
+    <div class="card-body p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="card-title mb-0 text-secondary">
+                <i class="fas fa-equals me-1"></i>Restricción ${constraintIndex + 1}
+            </h6>
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeConstraint(${constraintIndex})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2">`;
+
+        // Coeficientes de variables
+        for (let i = 0; i < variableCount; i++) {
+            if (i > 0) {
+                html += '<span class="text-muted">+</span>';
+            }
+            html += `
+        <div class="d-flex align-items-center">
+            <input type="number" step="0.1" class="form-control form-control-sm constraint-coef" 
+                   style="width: 70px;" id="constraint_${constraintIndex}_coef_${i}" value="1">
+            <span class="ms-1 fw-bold text-primary">x₍${i + 1}₎</span>        </div>`;
+        }
+
+        // Signo de la restricción (dinámico según objetivo)
+        const isMinimize = document.querySelector('input[name="objective_type"]:checked').value === 'minimize';
+        const signOption = isMinimize ?
+            '<option value=">=" selected>&ge;</option>' :
+            '<option value="<=" selected>&le;</option>';
+
+        html += `
+            <select class="form-select form-select-sm constraint-sign" style="width: 80px;" id="constraint_${constraintIndex}_sign">
+                ${signOption}
+            </select>
+            
+            <input type="number" step="0.1" class="form-control form-control-sm constraint-rhs" 
+                   style="width: 80px;" id="constraint_${constraintIndex}_rhs" value="1" placeholder="RHS">
+        </div>
+    </div>`;
+
+        constraintDiv.innerHTML = html;
+        container.appendChild(constraintDiv);
+        constraintCount++;
+
+        // Agregar eventos de auto-guardado a los nuevos inputs
+        addAutoSaveEvents(constraintDiv);
+
+        // Guardar cambios en localStorage
+        setTimeout(() => {
+            saveFormDataToLocalStorage();
+        }, 100);
+    }// Función para eliminar restricción
+    function removeConstraint(index) {
+        const constraint = document.getElementById(`constraint_${index}`);
+        if (constraint) {
+            constraint.remove();
+            updateConstraintLabels();
+
+            // Guardar cambios en localStorage
+            setTimeout(() => {
+                saveFormDataToLocalStorage();
+            }, 100);
+        }
+    }
+
+    // Función para actualizar etiquetas de restricciones
+    function updateConstraintLabels() {
+        const constraints = document.querySelectorAll('#constraints-container .card');
+        constraints.forEach((constraint, index) => {
+            const title = constraint.querySelector('.card-title');
+            if (title) {
+                title.innerHTML = `<i class="fas fa-equals me-1"></i>Restricción ${index + 1}`;
+            }
+        });
+    }
+
+    // Función para actualizar todas las restricciones cuando cambia el número de variables
+    function updateAllConstraints() {
+        const constraints = document.querySelectorAll('#constraints-container .card');
+        constraints.forEach((constraint, constraintIndex) => {
+            const cardBody = constraint.querySelector('.card-body');
+            if (!cardBody) return;
+
+            const coefficients = [];
+            const signInput = constraint.querySelector('.constraint-sign');
+            const rhsInput = constraint.querySelector('.constraint-rhs');
+            const sign = signInput ? signInput.value : '<=';
+            const rhs = rhsInput ? rhsInput.value : '1';
+
+            // Guardar valores actuales
+            for (let i = 0; i < 10; i++) {
+                const input = constraint.querySelector(`#constraint_${constraintIndex}_coef_${i}`);
+                if (input) {
+                    coefficients[i] = input.value;
                 }
             }
-        });        // Manejar el botón de animación con indicador de carga
-        const animationButton = document.getElementById('animationButton');
-        if (animationButton) {
-            animationButton.addEventListener('click', function (event) {
-                console.log('Animation button clicked'); // Debug log
 
-                const buttonText = this.querySelector('.button-text');
-                const buttonLoading = this.querySelector('.button-loading');
+            // Reconstruir la restricción
+            let html = `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="card-title mb-0 text-secondary">
+                <i class="fas fa-equals me-1"></i>Restricción ${constraintIndex + 1}
+            </h6>
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeConstraint(${constraintIndex})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2">`;
 
-                if (buttonText && buttonLoading) {
-                    // Cambiar el aspecto del botón inmediatamente
-                    buttonText.classList.add('d-none');
-                    buttonLoading.classList.remove('d-none');
+            for (let i = 0; i < variableCount; i++) {
+                if (i > 0) {
+                    html += '<span class="text-muted">+</span>';
+                }
+                const value = coefficients[i] || (i < 3 ? '1' : '0');
+                html += `
+            <div class="d-flex align-items-center">
+                <input type="number" step="0.1" class="form-control form-control-sm constraint-coef" 
+                       style="width: 70px;" id="constraint_${constraintIndex}_coef_${i}" value="${value}">
+                <span class="ms-1 fw-bold text-primary">x₍${i + 1}₎</span>
+            </div>`;
+            }
 
-                    // Mostrar mensaje de estado en la página
-                    showProcessingMessage();
+            html += `
+            <select class="form-select form-select-sm constraint-sign" style="width: 80px;" id="constraint_${constraintIndex}_sign">
+                <option value="<=" ${sign === '<=' ? 'selected' : ''}>&leq;</option>
+            </select>
+            
+            <input type="number" step="0.1" class="form-control form-control-sm constraint-rhs" 
+                   style="width: 80px;" id="constraint_${constraintIndex}_rhs" value="${rhs}" placeholder="RHS">
+        </div>`;
 
-                    // Deshabilitar el botón después de un pequeño delay para permitir el envío
-                    setTimeout(() => {
-                        this.disabled = true;
-                    }, 200);
+            cardBody.innerHTML = html;
+        });
+    }    // Función para preparar datos del formulario antes de enviar
+    function prepareFormData() {
+        // Recopilar coeficientes de la función objetivo
+        const objectiveCoefs = [];
+        for (let i = 0; i < variableCount; i++) {
+            const input = document.getElementById(`obj_coef_${i}`);
+            objectiveCoefs.push(parseFloat(input ? input.value : 0) || 0);
+        }
+        document.getElementById('c').value = objectiveCoefs.join(',');
+
+        // Recopilar restricciones
+        const constraints = document.querySelectorAll('#constraints-container .card');
+        const A = [];
+        const b = [];
+
+        constraints.forEach((constraint) => {
+            const row = [];
+            for (let i = 0; i < variableCount; i++) {
+                const input = constraint.querySelector(`input[id$="_coef_${i}"]`);
+                row.push(parseFloat(input ? input.value : 0) || 0);
+            }
+            A.push(row.join(','));
+
+            const rhsInput = constraint.querySelector('.constraint-rhs');
+            b.push(parseFloat(rhsInput ? rhsInput.value : 0) || 0);
+        });
+
+        document.getElementById('A').value = A.join('\n');
+        document.getElementById('b').value = b.join(',');
+
+        // Tipo de optimización
+        const isMinimize = document.getElementById('minimize').checked;
+        document.getElementById('minimize_hidden').value = isMinimize ? 'on' : '';
+
+        // Guardar datos dinámicos en localStorage antes de enviar
+        saveFormDataToLocalStorage();
+    }
+
+    // Función para guardar datos del formulario dinámico en localStorage
+    function saveFormDataToLocalStorage() {
+        const formData = {
+            variableCount: variableCount,
+            constraintCount: constraintCount,
+            objectiveType: document.querySelector('input[name="objective_type"]:checked').value,
+            trackIterations: document.getElementById('track_iterations').checked,
+            constraints: [],
+            objectiveCoefs: []
+        };
+
+        // Guardar coeficientes objetivo
+        for (let i = 0; i < variableCount; i++) {
+            const input = document.getElementById(`obj_coef_${i}`);
+            formData.objectiveCoefs.push(input ? input.value : '');
+        }
+
+        // Guardar restricciones
+        const constraints = document.querySelectorAll('#constraints-container .card');
+        constraints.forEach((constraint) => {
+            const constraintData = {
+                coefs: [],
+                rhs: ''
+            };
+
+            for (let i = 0; i < variableCount; i++) {
+                const input = constraint.querySelector(`input[id$="_coef_${i}"]`);
+                constraintData.coefs.push(input ? input.value : '');
+            }
+
+            const rhsInput = constraint.querySelector('.constraint-rhs');
+            constraintData.rhs = rhsInput ? rhsInput.value : '';
+
+            formData.constraints.push(constraintData);
+        });
+
+        localStorage.setItem('simplex_dynamic_form_data', JSON.stringify(formData));
+    }    // Función para limpiar formulario
+    function clearForm() {
+        // Resetear a valores por defecto
+        variableCount = 3;
+        document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector('.btn-group .btn:nth-child(2)').classList.add('active');
+
+        document.getElementById('maximize').checked = true;
+        document.getElementById('track_iterations').checked = true;
+
+        // Limpiar campos hidden
+        document.getElementById('c').value = '';
+        document.getElementById('A').value = '';
+        document.getElementById('b').value = '';
+        document.getElementById('minimize_hidden').value = '';
+
+        // Limpiar datos guardados en localStorage
+        localStorage.removeItem('simplex_dynamic_form_data');
+
+        initializeForm();
+    }    // Función para cargar ejemplos
+    function loadExample(method, exampleIndex) {
+        if (typeof examples === 'undefined' || !examples[method] || !examples[method][exampleIndex]) {
+            console.error('Ejemplo no encontrado');
+            return;
+        }
+
+        const example = examples[method][exampleIndex];
+
+        // Determinar número de variables
+        const cValues = example.c.split(',');
+        variableCount = cValues.length;
+
+        // Actualizar botones de variables
+        document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+        const buttonIndex = variableCount - 2; // 2 variables = índice 0
+        if (buttonIndex >= 0 && buttonIndex < 4) {
+            document.querySelectorAll('.btn-group .btn')[buttonIndex].classList.add('active');
+        }
+
+        // Configurar objetivo
+        document.getElementById(example.minimize ? 'minimize' : 'maximize').checked = true;
+
+        updateObjectiveFunction();
+
+        // Cargar coeficientes objetivo
+        cValues.forEach((val, i) => {
+            const input = document.getElementById(`obj_coef_${i}`);
+            if (input) input.value = parseFloat(val.trim());
+        });
+
+        // Cargar restricciones
+        const ARows = example.A.split('\n');
+        const bValues = example.b.split(',');
+
+        // Limpiar restricciones existentes
+        document.getElementById('constraints-container').innerHTML = '';
+        constraintCount = 0;
+
+        // Agregar restricciones del ejemplo
+        ARows.forEach((row, rowIndex) => {
+            if (row.trim()) {
+                addConstraint();
+                const coeffs = row.split(',');
+                coeffs.forEach((coeff, colIndex) => {
+                    const input = document.getElementById(`constraint_${rowIndex}_coef_${colIndex}`);
+                    if (input) input.value = parseFloat(coeff.trim());
+                });
+
+                const rhsInput = document.getElementById(`constraint_${rowIndex}_rhs`);
+                if (rhsInput && bValues[rowIndex]) {
+                    rhsInput.value = parseFloat(bValues[rowIndex].trim());
+                }
+            }
+        });
+
+        // Guardar los datos cargados en localStorage
+        setTimeout(() => {
+            saveFormDataToLocalStorage();
+        }, 100);
+    }    // Función para inicializar el formulario
+    function initializeForm() {
+        // Limpiar contenedor de restricciones
+        document.getElementById('constraints-container').innerHTML = '';
+        constraintCount = 0;
+
+        // Actualizar función objetivo
+        updateObjectiveFunction();
+
+        // Agregar restricciones por defecto
+        for (let i = 0; i < 3; i++) {
+            addConstraint();
+        }
+
+        // Cargar ejemplo por defecto
+        loadExample('simplex', 0);
+    }// Función para restaurar datos del formulario desde localStorage o campos hidden
+    function restoreFormData() {
+        // Primero intentar restaurar desde localStorage (datos dinámicos)
+        const savedDynamicData = localStorage.getItem('simplex_dynamic_form_data');
+        if (savedDynamicData) {
+            try {
+                const formData = JSON.parse(savedDynamicData);
+
+                // Restaurar configuración básica
+                variableCount = formData.variableCount || 3;
+                constraintCount = 0;
+
+                // Actualizar botones de variables
+                document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+                const buttonIndex = Math.min(Math.max(variableCount - 2, 0), 3);
+                const varButtons = document.querySelectorAll('.btn-group .btn');
+                if (varButtons[buttonIndex]) {
+                    varButtons[buttonIndex].classList.add('active');
                 }
 
-                // Asegurar que el formulario se envíe
-                const form = this.closest('form');
-                if (form) {
-                    console.log('Form found, submitting...'); // Debug log
-                    // No prevenir el comportamiento por defecto
+                // Configurar tipo de optimización
+                if (formData.objectiveType) {
+                    document.getElementById(formData.objectiveType).checked = true;
+                }
+
+                // Configurar checkbox de iteraciones
+                if (formData.trackIterations !== undefined) {
+                    document.getElementById('track_iterations').checked = formData.trackIterations;
+                }
+
+                // Actualizar función objetivo
+                updateObjectiveFunction();
+
+                // Restaurar coeficientes objetivo
+                if (formData.objectiveCoefs) {
+                    formData.objectiveCoefs.forEach((val, i) => {
+                        const input = document.getElementById(`obj_coef_${i}`);
+                        if (input) input.value = val;
+                    });
+                }
+
+                // Limpiar y restaurar restricciones
+                document.getElementById('constraints-container').innerHTML = '';
+                constraintCount = 0;
+
+                if (formData.constraints) {
+                    formData.constraints.forEach((constraintData, index) => {
+                        addConstraint();
+
+                        // Restaurar coeficientes
+                        constraintData.coefs.forEach((coeff, colIndex) => {
+                            const input = document.getElementById(`constraint_${index}_coef_${colIndex}`);
+                            if (input) input.value = coeff;
+                        });
+
+                        // Restaurar RHS
+                        const rhsInput = document.getElementById(`constraint_${index}_rhs`);
+                        if (rhsInput) rhsInput.value = constraintData.rhs;
+                    });
+                }
+
+                return; // Salir aquí si se restauró desde localStorage
+            } catch (e) {
+                console.error('Error al restaurar datos dinámicos:', e);
+            }
+        }
+
+        // Si no hay datos dinámicos, intentar restaurar desde campos hidden (método anterior)
+        const cField = document.getElementById('c');
+        const AField = document.getElementById('A');
+        const bField = document.getElementById('b');
+        const minimizeField = document.getElementById('minimize_hidden');
+
+        // Si hay datos guardados, restaurarlos
+        if (cField && cField.value && AField && AField.value && bField && bField.value) {
+            const cValues = cField.value.split(',');
+            const ARows = AField.value.split('\n').filter(row => row.trim());
+            const bValues = bField.value.split(',');
+
+            // Configurar número de variables
+            variableCount = cValues.length;
+
+            // Actualizar botones de variables
+            document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+            const buttonIndex = Math.min(Math.max(variableCount - 2, 0), 3);
+            const varButtons = document.querySelectorAll('.btn-group .btn');
+            if (varButtons[buttonIndex]) {
+                varButtons[buttonIndex].classList.add('active');
+            }
+
+            // Configurar tipo de optimización
+            const isMinimize = minimizeField && minimizeField.value === 'on';
+            document.getElementById(isMinimize ? 'minimize' : 'maximize').checked = true;
+
+            // Actualizar función objetivo
+            updateObjectiveFunction();
+
+            // Cargar coeficientes objetivo
+            cValues.forEach((val, i) => {
+                const input = document.getElementById(`obj_coef_${i}`);
+                if (input) input.value = parseFloat(val.trim()) || 0;
+            });
+
+            // Limpiar y cargar restricciones
+            document.getElementById('constraints-container').innerHTML = '';
+            constraintCount = 0;
+
+            ARows.forEach((row, rowIndex) => {
+                if (row.trim()) {
+                    addConstraint();
+                    const coeffs = row.split(',');
+                    coeffs.forEach((coeff, colIndex) => {
+                        const input = document.getElementById(`constraint_${rowIndex}_coef_${colIndex}`);
+                        if (input) input.value = parseFloat(coeff.trim()) || 0;
+                    });
+
+                    const rhsInput = document.getElementById(`constraint_${rowIndex}_rhs`);
+                    if (rhsInput && bValues[rowIndex]) {
+                        rhsInput.value = parseFloat(bValues[rowIndex].trim()) || 0;
+                    }
                 }
             });
+        } else {
+            // Si no hay datos guardados, inicializar con valores por defecto
+            initializeForm();
         }
+
+        // Actualizar signos de restricción después de restaurar
+        setTimeout(() => {
+            updateConstraintSigns();
+        }, 50);
+    }// Inicializar cuando se carga la página
+    document.addEventListener('DOMContentLoaded', function () {
+        // Agregar evento submit al formulario
+        const form = document.getElementById('simplexForm');
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                prepareFormData();
+            });
+        }
+
+        // Usar setTimeout para asegurar que todo esté cargado antes de restaurar
+        setTimeout(() => {            // Restaurar datos si existen, sino inicializar
+            restoreFormData();
+
+            // Actualizar signos de restricción según el objetivo actual
+            updateConstraintSigns();
+
+            // Configurar auto-guardado para controles principales
+            setupMainFormAutoSave();
+        }, 100);
     });
 
-    function showProcessingMessage() {
-        // Crear o actualizar mensaje de procesamiento
-        let processingDiv = document.getElementById('processing-message');
-        if (!processingDiv) {
-            processingDiv = document.createElement('div');
-            processingDiv.id = 'processing-message';
-            processingDiv.className = 'alert alert-info mt-3';
-            processingDiv.innerHTML = `
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-cogs fa-spin me-3"></i>
-                    <div>
-                        <strong>Generando animación...</strong>
-                        <div class="small">Este proceso puede tomar algunos minutos. Por favor, espere.</div>
-                    </div>
-                </div>
-            `;
+    // Función para actualizar los signos de restricción según el objetivo
+    function updateConstraintSigns() {
+        const isMinimize = document.querySelector('input[name="objective_type"]:checked').value === 'minimize';
+        const constraintSigns = document.querySelectorAll('.constraint-sign');
 
-            // Insertar después del formulario
-            const form = document.querySelector('form');
-            if (form && form.parentNode) {
-                form.parentNode.insertBefore(processingDiv, form.nextSibling);
+        constraintSigns.forEach(select => {
+            // Limpiar opciones existentes
+            select.innerHTML = '';
+
+            if (isMinimize) {
+                // Para minimización: ≥ (mayor o igual)
+                select.innerHTML = '<option value=">=" selected>&ge;</option>';
+            } else {
+                // Para maximización: ≤ (menor o igual)
+                select.innerHTML = '<option value="<=" selected>&le;</option>';
             }
+        });
+    }
+
+    // Función para configurar auto-guardado en controles principales
+    function setupMainFormAutoSave() {
+        // Radio buttons de objetivo
+        const objectiveRadios = document.querySelectorAll('input[name="objective_type"]');
+        objectiveRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                updateConstraintSigns();
+                saveFormDataToLocalStorage();
+            });
+        });
+
+        // Checkbox de mostrar iteraciones
+        const trackIterationsCheckbox = document.getElementById('track_iterations');
+        if (trackIterationsCheckbox) {
+            trackIterationsCheckbox.addEventListener('change', saveFormDataToLocalStorage);
         }
-        processingDiv.style.display = 'block';
+
+        // Botones de cambio de variables
+        const variableButtons = document.querySelectorAll('.btn-group .btn');
+        variableButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                setTimeout(saveFormDataToLocalStorage, 100); // Pequeño delay para que se actualice variableCount
+            });
+        });
     }
 </script>
-{% if video_url or image_url %}
-<script>
-    // Espera a que el DOM esté listo
-    document.addEventListener('DOMContentLoaded', function () {
-        var mediaCard = document.querySelector('.card.mt-4');
-        if (mediaCard) {
-            mediaCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+<style>
+    /* Estilos para el formulario mejorado */
+    .constraint-coef,
+    .constraint-rhs {
+        min-width: 70px;
+    }
+
+    .constraint-sign {
+        min-width: 80px;
+    }
+
+    .card {
+        transition: all 0.3s ease;
+    }
+
+    .card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .btn-group .btn {
+        transition: all 0.2s ease;
+    }
+
+    .btn-group .btn.active {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+        color: white;
+    }
+
+    .form-control-sm {
+        font-size: 0.875rem;
+    }
+
+    .text-primary {
+        font-weight: 600;
+    }
+
+    .gap-2 {
+        gap: 0.5rem !important;
+    }
+
+    /* Animaciones suaves */
+    .card-body {
+        transition: all 0.3s ease;
+    }
+
+    /* Mejorar el spacing */
+    .d-flex.align-items-center {
+        min-height: 38px;
+    }
+
+    /* Estilos para los inputs numéricos */
+    input[type="number"] {
+        text-align: center;
+    }
+
+    /* Mejorar la apariencia de los radio buttons */
+    .form-check-input:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+
+    /* Estilos para las etiquetas de variables */
+    .text-primary {
+        color: #0d6efd !important;
+    }
+
+    /* Mejorar el diseño responsive */
+    @media (max-width: 768px) {
+        .d-flex.flex-wrap {
+            flex-direction: column;
+            align-items: stretch !important;
         }
-    });
-</script>
-{% endif %}
+
+        .d-flex.flex-wrap .d-flex {
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .constraint-coef,
+        .constraint-rhs,
+        .constraint-sign {
+            min-width: auto;
+            width: 100%;
+        }
+    }
+</style>
 {% endblock %}

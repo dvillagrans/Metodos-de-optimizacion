@@ -20,45 +20,55 @@
                 </h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('main.resolver_dosfases') }}">
-                    <div class="mb-3">
-                        <label for="c" class="form-label">Función Objetivo (c):</label>
-                        <input type="text" class="form-control" id="c" name="c" placeholder="Ej: 3,2,1"
-                            value="{{ form_data.c if form_data else '' }}" required>
-                        <div class="form-text">Coeficientes separados por comas</div>
+                <!-- Interfaz Dinámica Mejorada -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Número de Variables:</label>
+                    <div class="input-group mb-3" style="max-width: 150px;">
+                        <input type="number" class="form-control" id="numVariables" min="2" max="10" value="2">
+                        <button class="btn btn-outline-secondary" type="button" onclick="updateVariables()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ url_for('main.resolver_dosfases') }}" id="doseasesForm">
+                    <!-- Función Objetivo -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-bullseye me-2"></i>Función Objetivo:
+                        </label>
+                        <div class="objective-container">
+                            <div class="row align-items-center mb-2">
+                                <div class="col-auto">Z =</div>
+                                <div class="col" id="objectiveInputs"></div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="A" class="form-label">Matriz de Restricciones (A):</label>
-                        <textarea class="form-control" id="A" name="A" rows="4" placeholder="1,2,1&#10;2,1,3&#10;1,1,1"
-                            required>{{ form_data.A if form_data else '' }}</textarea>
-                        <div class="form-text">Una fila por línea, coeficientes separados por comas</div>
+                    <!-- Restricciones -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <label class="form-label fw-bold mb-0">
+                                <i class="fas fa-equals me-2"></i>Restricciones:
+                            </label>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-success me-1" onclick="addConstraint()">
+                                    <i class="fas fa-plus me-1"></i>Agregar
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger" onclick="removeConstraint()">
+                                    <i class="fas fa-minus me-1"></i>Quitar
+                                </button>
+                            </div>
+                        </div>
+                        <div id="constraintsContainer"></div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="b" class="form-label">Vector de Recursos (b):</label>
-                        <input type="text" class="form-control" id="b" name="b" placeholder="Ej: 12,8,6"
-                            value="{{ form_data.b if form_data else '' }}" required>
-                        <div class="form-text">Valores separados por comas</div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="eq_constraints" class="form-label">Restricciones de Igualdad:</label>
-                        <input type="text" class="form-control" id="eq_constraints" name="eq_constraints"
-                            placeholder="Ej: 0,2 (opcional)"
-                            value="{{ form_data.eq_constraints if form_data else '' }}">
-                        <div class="form-text">Índices de restricciones de igualdad (empezando desde 0), separados por
-                            comas</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="ge_constraints" class="form-label">Restricciones de ≥:</label>
-                        <input type="text" class="form-control" id="ge_constraints" name="ge_constraints"
-                            placeholder="Ej: 1,2 (opcional)"
-                            value="{{ form_data.ge_constraints if form_data else '' }}">
-                        <div class="form-text">Índices de restricciones de tipo ≥ (empezando desde 0), separados por
-                            comas</div>
-                    </div>
-
+                    <!-- Campos ocultos para el formulario tradicional -->
+                    <input type="hidden" id="c" name="c">
+                    <input type="hidden" id="A" name="A">
+                    <input type="hidden" id="b" name="b">
+                    <input type="hidden" id="eq_constraints" name="eq_constraints">
+                    <input type="hidden" id="ge_constraints" name="ge_constraints">
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-check mb-3">
@@ -80,20 +90,397 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Botones de Acción -->
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-2">
                             <button type="submit" class="btn btn-warning text-dark w-100">
                                 <i class="fas fa-calculator me-2"></i>Resolver
                             </button>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <button type="submit" formaction="{{ url_for('main.generar_animacion_dosfases') }}"
-                                class="btn btn-info w-100">
-                                <i class="fas fa-play me-2"></i>Resolver con Animación
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-outline-primary w-100" onclick="loadExample()">
+                                <i class="fas fa-lightbulb me-2"></i>Ejemplo
+                            </button>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <button type="button" class="btn btn-outline-secondary w-100" onclick="clearForm()">
+                                <i class="fas fa-eraser me-2"></i>Limpiar
                             </button>
                         </div>
                     </div>
                 </form>
+
+                <!-- Scripts JavaScript para la interfaz dinámica -->
+                <script>
+                    let numVars = 2;
+                    let numConstraints = 3;
+
+                    function updateVariables() {
+                        numVars = parseInt(document.getElementById('numVariables').value);
+                        if (numVars < 2) numVars = 2;
+                        if (numVars > 10) numVars = 10;
+                        document.getElementById('numVariables').value = numVars;
+
+                        generateObjectiveInputs();
+                        generateConstraintInputs();
+                    }
+
+                    function generateObjectiveInputs() {
+                        const container = document.getElementById('objectiveInputs');
+                        container.innerHTML = '';
+
+                        for (let i = 0; i < numVars; i++) {
+                            const wrapper = document.createElement('div');
+                            wrapper.className = 'coefficient-group d-inline-block me-2 mb-2';
+
+                            const input = document.createElement('input');
+                            input.type = 'number';
+                            input.step = 'any';
+                            input.className = 'form-control form-control-sm';
+                            input.style.width = '70px';
+                            input.placeholder = '0';
+                            input.id = `c_${i}`;
+
+                            const label = document.createElement('label');
+                            label.className = 'form-label-sm ms-1';
+                            label.textContent = `x₍${i + 1}₎`;
+
+                            wrapper.appendChild(input);
+                            wrapper.appendChild(label);
+                            container.appendChild(wrapper);
+
+                            if (i < numVars - 1) {
+                                const plus = document.createElement('span');
+                                plus.className = 'me-2';
+                                plus.textContent = '+';
+                                container.appendChild(plus);
+                            }
+                        }
+                    }
+
+                    function generateConstraintInputs() {
+                        const container = document.getElementById('constraintsContainer');
+                        container.innerHTML = '';
+
+                        for (let i = 0; i < numConstraints; i++) {
+                            addConstraintRow(i);
+                        }
+                    }
+
+                    function addConstraintRow(index) {
+                        const container = document.getElementById('constraintsContainer');
+                        const row = document.createElement('div');
+                        row.className = 'constraint-row mb-3 p-3 border rounded';
+                        row.id = `constraint_${index}`;
+
+                        let html = `<div class="row align-items-center">`;
+
+                        // Coeficientes
+                        html += '<div class="col-md-7">';
+                        for (let j = 0; j < numVars; j++) {
+                            html += `
+                            <div class="coefficient-group d-inline-block me-2 mb-2">
+                                <input type="number" step="any" class="form-control form-control-sm" 
+                                       style="width: 70px;" placeholder="0" id="a_${index}_${j}">
+                                <label class="form-label-sm ms-1">x₍${j + 1}₎</label>
+                            </div>
+                        `;
+                            if (j < numVars - 1) {
+                                html += '<span class="me-2">+</span>';
+                            }
+                        }
+                        html += '</div>';
+
+                        // Signo de restricción
+                        html += `
+                        <div class="col-md-2">
+                            <select class="form-select form-select-sm" id="sign_${index}">
+                                <option value="<=">&le;</option>
+                                <option value=">=">&ge;</option>
+                                <option value="=">=</option>
+                            </select>
+                        </div>
+                    `;
+
+                        // Valor del lado derecho
+                        html += `
+                        <div class="col-md-3">
+                            <input type="number" step="any" class="form-control form-control-sm" 
+                                   placeholder="0" id="b_${index}">
+                        </div>
+                    `;
+
+                        html += '</div>';
+                        row.innerHTML = html;
+                        container.appendChild(row);
+                    }
+
+                    function addConstraint() {
+                        if (numConstraints < 10) {
+                            addConstraintRow(numConstraints);
+                            numConstraints++;
+                        }
+                    }
+
+                    function removeConstraint() {
+                        if (numConstraints > 1) {
+                            numConstraints--;
+                            const row = document.getElementById(`constraint_${numConstraints}`);
+                            if (row) row.remove();
+                        }
+                    }
+
+                    function prepareFormData() {
+                        // Función objetivo
+                        const c = [];
+                        for (let i = 0; i < numVars; i++) {
+                            const val = document.getElementById(`c_${i}`).value;
+                            c.push(val === '' ? 0 : parseFloat(val));
+                        }
+                        document.getElementById('c').value = c.join(',');
+
+                        // Matriz A y vector b
+                        const A = [];
+                        const b = [];
+                        const eqConstraints = [];
+                        const geConstraints = [];
+
+                        for (let i = 0; i < numConstraints; i++) {
+                            const row = [];
+                            for (let j = 0; j < numVars; j++) {
+                                const val = document.getElementById(`a_${i}_${j}`).value;
+                                row.push(val === '' ? 0 : parseFloat(val));
+                            }
+                            A.push(row);
+
+                            const bVal = document.getElementById(`b_${i}`).value;
+                            b.push(bVal === '' ? 0 : parseFloat(bVal));
+
+                            const sign = document.getElementById(`sign_${i}`).value;
+                            if (sign === '=') {
+                                eqConstraints.push(i);
+                            } else if (sign === '>=') {
+                                geConstraints.push(i);
+                            }
+                        }
+
+                        document.getElementById('A').value = A.map(row => row.join(',')).join('\n');
+                        document.getElementById('b').value = b.join(',');
+                        document.getElementById('eq_constraints').value = eqConstraints.join(',');
+                        document.getElementById('ge_constraints').value = geConstraints.join(',');
+                    }
+
+                    function loadExample() {
+                        // Ejemplo típico para dos fases
+                        numVars = 3;
+                        numConstraints = 3;
+                        document.getElementById('numVariables').value = numVars;
+
+                        updateVariables();
+
+                        // Función objetivo: 3x₁ + 2x₂ + x₃
+                        document.getElementById('c_0').value = 3;
+                        document.getElementById('c_1').value = 2;
+                        document.getElementById('c_2').value = 1;
+
+                        // Restricciones
+                        // x₁ + 2x₂ + x₃ = 12
+                        document.getElementById('a_0_0').value = 1;
+                        document.getElementById('a_0_1').value = 2;
+                        document.getElementById('a_0_2').value = 1;
+                        document.getElementById('sign_0').value = '=';
+                        document.getElementById('b_0').value = 12;
+
+                        // 2x₁ + x₂ + 3x₃ ≤ 8
+                        document.getElementById('a_1_0').value = 2;
+                        document.getElementById('a_1_1').value = 1;
+                        document.getElementById('a_1_2').value = 3;
+                        document.getElementById('sign_1').value = '<=';
+                        document.getElementById('b_1').value = 8;
+
+                        // x₁ + x₂ + x₃ ≥ 6
+                        document.getElementById('a_2_0').value = 1;
+                        document.getElementById('a_2_1').value = 1;
+                        document.getElementById('a_2_2').value = 1;
+                        document.getElementById('sign_2').value = '>=';
+                        document.getElementById('b_2').value = 6;
+                    }
+
+                    function clearForm() {
+                        // Limpiar función objetivo
+                        for (let i = 0; i < numVars; i++) {
+                            document.getElementById(`c_${i}`).value = '';
+                        }
+
+                        // Limpiar restricciones
+                        for (let i = 0; i < numConstraints; i++) {
+                            for (let j = 0; j < numVars; j++) {
+                                document.getElementById(`a_${i}_${j}`).value = '';
+                            }
+                            document.getElementById(`b_${i}`).value = '';
+                            document.getElementById(`sign_${i}`).value = '<=';
+                        }
+
+                        // Limpiar checkboxes
+                        document.getElementById('minimize').checked = false;
+                        document.getElementById('track_iterations').checked = false;
+                    }
+
+                    // Preparar datos antes de enviar el formulario
+                    document.getElementById('doseasesForm').addEventListener('submit', function (e) {
+                        prepareFormData();
+                    });                    // Inicializar la interfaz
+                    document.addEventListener('DOMContentLoaded', function () {
+                        // Verificar si hay datos del formulario para restaurar
+                        restoreFormDataDosFases();
+                        updateVariables();
+                    });
+
+                    // Función para restaurar datos del formulario después de resolver (Dos Fases)
+                    function restoreFormDataDosFases() {
+                        const formDataC = "{{ form_data.c if form_data else '' }}";
+                        const formDataA = "{{ form_data.A if form_data else '' }}";
+                        const formDataB = "{{ form_data.b if form_data else '' }}";
+                        const formDataEqConstraints = "{{ form_data.eq_constraints if form_data else '' }}";
+                        const formDataGeConstraints = "{{ form_data.ge_constraints if form_data else '' }}";
+                        const formDataMinimize = "{{ form_data.minimize if form_data else '' }}";
+                        const formDataTrackIterations = "{{ form_data.track_iterations if form_data else '' }}";
+
+                        if (formDataC && formDataA && formDataB) {
+                            // Hay datos para restaurar
+                            const cValues = formDataC.split(',').map(v => parseFloat(v.trim()));
+                            const aRows = formDataA.split('\n').map(row => row.split(',').map(v => parseFloat(v.trim())));
+                            const bValues = formDataB.split(',').map(v => parseFloat(v.trim()));
+
+                            // Parsear restricciones especiales
+                            const eqConstraints = formDataEqConstraints ? formDataEqConstraints.split(',').map(v => parseInt(v.trim())) : [];
+                            const geConstraints = formDataGeConstraints ? formDataGeConstraints.split(',').map(v => parseInt(v.trim())) : [];
+
+                            // Determinar número de variables
+                            numVars = cValues.length;
+                            numConstraints = aRows.length;
+
+                            // Actualizar el selector de número de variables
+                            document.getElementById('numVariables').value = numVars;
+
+                            // Configurar objetivo (minimizar/maximizar)
+                            if (formDataMinimize) {
+                                document.getElementById('minimize').checked = true;
+                            }
+
+                            // Configurar track_iterations
+                            if (formDataTrackIterations) {
+                                document.getElementById('track_iterations').checked = true;
+                            }
+
+                            // Esperar un momento para que se genere la interfaz
+                            setTimeout(() => {
+                                // Generar la interfaz con el número correcto de variables
+                                generateObjectiveInputs();
+                                generateConstraintInputs();
+
+                                // Restaurar coeficientes de la función objetivo
+                                cValues.forEach((val, i) => {
+                                    const input = document.getElementById(`c_${i}`);
+                                    if (input) input.value = val;
+                                });
+
+                                // Restaurar restricciones
+                                aRows.forEach((row, rowIndex) => {
+                                    // Establecer coeficientes
+                                    row.forEach((coeff, colIndex) => {
+                                        const input = document.getElementById(`a_${rowIndex}_${colIndex}`);
+                                        if (input) input.value = coeff;
+                                    });
+
+                                    // Establecer valor del lado derecho
+                                    const rhsInput = document.getElementById(`b_${rowIndex}`);
+                                    if (rhsInput && bValues[rowIndex] !== undefined) {
+                                        rhsInput.value = bValues[rowIndex];
+                                    }
+
+                                    // Establecer el signo de la restricción
+                                    const signSelect = document.getElementById(`sign_${rowIndex}`);
+                                    if (signSelect) {
+                                        if (eqConstraints.includes(rowIndex)) {
+                                            signSelect.value = '=';
+                                        } else if (geConstraints.includes(rowIndex)) {
+                                            signSelect.value = '>=';
+                                        } else {
+                                            signSelect.value = '<=';
+                                        }
+                                    }
+                                });
+                            }, 100);
+                        }
+                    }
+                </script>
+
+                <!-- Estilos CSS adicionales -->
+                <style>
+                    .coefficient-group {
+                        display: inline-flex;
+                        align-items: center;
+                        flex-direction: column;
+                        text-align: center;
+                    }
+
+                    .coefficient-group input {
+                        margin-bottom: 2px;
+                    }
+
+                    .coefficient-group label {
+                        font-size: 0.8rem;
+                        margin: 0;
+                        color: #6c757d;
+                    }
+
+                    .constraint-row {
+                        background-color: #f8f9fa;
+                        transition: all 0.3s ease;
+                    }
+
+                    .constraint-row:hover {
+                        background-color: #e9ecef;
+                    }
+
+                    .objective-container {
+                        background-color: #fff3cd;
+                        padding: 15px;
+                        border-radius: 8px;
+                        border-left: 4px solid #ffc107;
+                    }
+
+                    .form-label-sm {
+                        font-size: 0.8rem;
+                        color: #6c757d;
+                        margin: 0;
+                    }
+
+                    .btn-download-json {
+                        background: linear-gradient(45deg, #28a745, #20c997);
+                        border: none;
+                        transition: all 0.3s ease;
+                    }
+
+                    .btn-download-json:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+                    }
+
+                    @media (max-width: 768px) {
+                        .coefficient-group {
+                            margin-bottom: 10px;
+                        }
+
+                        .constraint-row .col-md-7,
+                        .constraint-row .col-md-2,
+                        .constraint-row .col-md-3 {
+                            margin-bottom: 10px;
+                        }
+                    }
+                </style>
             </div>
         </div>
     </div>
@@ -238,25 +625,7 @@
     </div> {% endif %}
     {% endif %}
 
-    {% if video_url %}
-    <div class="card mt-4">
-        <div class="card-header bg-warning text-dark">
-            <h5 class="mb-0">
-                <i class="fas fa-film me-2"></i>Animación del Proceso
-            </h5>
-        </div>
-        <div class="card-body text-center">
-            <video width="100%" height="400" controls>
-                <source src="{{ video_url }}" type="video/mp4">
-                Tu navegador no soporta el elemento de video.
-            </video>
-            <p class="mt-2 text-muted">
-                <i class="fas fa-info-circle me-1"></i>
-                Animación generada mostrando el proceso de resolución paso a paso
-            </p>
-        </div>
-    </div>
-    {% endif %}
+    {% if video_url %} {% endif %}
 </div>
 {% endif %}
 </div>

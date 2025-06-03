@@ -1,88 +1,48 @@
 [
     {
-        "nombre": "Ejemplo 1 - Producción",
-        "c": [
-            5,
-            7
-        ],
-        "A": [
-            [
-                2,
-                3
-            ],
-            [
-                1,
-                1
-            ],
-            [
-                1,
-                0
-            ]
-        ],
-        "b": [
-            12,
-            5,
-            3
-        ]
-    },
-    {
-        "nombre": "Ejemplo 2 - Transporte",
+        "nombre": "Problema 4",
+        "descripcion": "Minimizaci\u00f3n con restricciones >= y soluciones m\u00faltiples",
+        "metodo": "dosfases",
         "c": [
             3,
-            4,
-            6
+            2,
+            3,
+            0
         ],
         "A": [
             [
                 1,
-                1,
-                1
+                4,
+                3,
+                0
             ],
             [
                 2,
                 1,
-                0
-            ],
-            [
                 0,
-                1,
-                2
-            ]
-        ],
-        "b": [
-            10,
-            8,
-            7
-        ]
-    },
-    {
-        "nombre": "Ejemplo 3 - Inversión",
-        "c": [
-            0.2,
-            0.3,
-            0.1
-        ],
-        "A": [
-            [
-                1,
-                1,
                 1
-            ],
-            [
-                0.5,
-                0.2,
-                0.3
-            ],
-            [
-                0.1,
-                0.4,
-                0.2
             ]
         ],
         "b": [
-            1000,
-            400,
-            300
-        ]
+            7,
+            10
+        ],
+        "eq_constraints": [],
+        "ge_constraints": [
+            0,
+            1
+        ],
+        "minimize": true,
+        "solucion_esperada": {
+            "x": [
+                0,
+                1.75,
+                0,
+                8.25
+            ],
+            "z": 3.5,
+            "multiple_solutions": true,
+            "nota": "Hay m\u00faltiples soluciones \u00f3ptimas en el segmento: 3x1 + 2x2 + 3x3 + 0x4 = 7/2"
+        }
     }
 ]

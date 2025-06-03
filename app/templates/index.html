@@ -97,12 +97,11 @@
         <h1>🔺 Métodos de Optimización</h1>
         <p>API para resolver problemas de programación lineal</p>
     </header>
-
     <div class="container">
         <div class="card">
             <h2>Bienvenido a la API de Métodos de Optimización</h2>
-            <p>Esta API permite resolver problemas de programación lineal utilizando diferentes métodos de optimización
-                y generar animaciones visuales de los resultados.</p>
+            <p>Esta API permite resolver problemas de programación lineal utilizando diferentes métodos de optimización.
+            </p>
             <p>Disponemos de las siguientes implementaciones:</p>
             <ul>
                 <li><strong>Método Simplex</strong>: Para problemas de programación lineal estándar.</li>
@@ -170,23 +169,6 @@
 }</pre>
                 <p><strong>Respuesta</strong>: Objeto JSON con la solución, valor óptimo y opcionalmente el historial de
                     iteraciones.</p>
-            </div>
-
-            <div class="endpoint">
-                <h3><span class="method">POST</span> /api/animar</h3>
-                <p>Genera una animación visual para un problema resuelto.</p>
-                <p><strong>Cuerpo de la petición</strong>:</p>
-                <pre>
-{
-  "c": [5, 7],
-  "A": [[2, 3], [1, 1], [1, 0]],
-  "b": [12, 5, 3],
-  "solution": [3, 2],
-  "optimal_value": 29,
-  "minimize": false,
-  "method": "simplex"
-}</pre>
-                <p><strong>Respuesta</strong>: Objeto JSON con la URL del video generado.</p>
             </div>
         </div>
     </div>

@@ -375,12 +375,16 @@ document.addEventListener('DOMContentLoaded', function () {
         currentMethod = 'granm';
     } else if (window.location.pathname.includes('dosfases')) {
         currentMethod = 'dosfases';
-    }
-
-    // Agregar botones de ejemplo si estamos en una página de método
+    }    // Agregar botones de ejemplo si estamos en una página de método Y no existen ya
     if (currentMethod && examples[currentMethod]) {
         const form = document.querySelector('form');
-        if (form) {
+        // Verificar si ya existen botones de ejemplo en el HTML
+        const existingExamples = document.querySelector('.form-label:contains("Ejemplos Rápidos"), .form-label[innerHTML*="Ejemplos Rápidos"], label[class*="form-label"]:has([class*="fa-star"])');
+        const existingExamplesByText = Array.from(document.querySelectorAll('.form-label')).find(label =>
+            label.textContent.includes('Ejemplos Rápidos')
+        );
+
+        if (form && !existingExamplesByText) {
             const exampleButtonsContainer = document.createElement('div');
             exampleButtonsContainer.className = 'mb-3';
             exampleButtonsContainer.innerHTML = `
