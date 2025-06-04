@@ -503,9 +503,7 @@
     function initializeFormGranM() {
         updateObjectiveFunction();
         initializeConstraintsGranM();
-    }
-
-    // Actualizar número de variables
+    }    // Actualizar número de variables
     function updateVariableCount(count) {
         variableCount = count;
 
@@ -515,6 +513,67 @@
 
         updateObjectiveFunction();
         updateAllConstraintsGranM();
+    }
+
+    // Actualizar todas las restricciones existentes con el nuevo número de variables
+    function updateAllConstraintsGranM() {
+        const constraints = document.querySelectorAll('#constraints-container .card');
+
+        constraints.forEach((constraint, constraintIndex) => {
+            // Obtener valores existentes antes de regenerar
+            const existingValues = {};
+            const existingRHS = constraint.querySelector('.constraint-rhs')?.value || '1';
+            const existingSign = constraint.querySelector('.constraint-sign')?.value || '<=';
+
+            // Guardar valores existentes de coeficientes
+            for (let i = 0; i < 10; i++) { // Buscar hasta 10 variables posibles
+                const input = constraint.querySelector(`input[id$="_coef_${i}"]`);
+                if (input) {
+                    existingValues[i] = input.value;
+                }
+            }
+
+            // Regenerar el contenido de la restricción
+            const cardBody = constraint.querySelector('.card-body');
+            let html = `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="card-title mb-0 text-secondary">
+                    <i class="fas fa-equals me-1"></i>Restricción ${constraintIndex + 1}
+                </h6>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeConstraint(${constraintIndex})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2">`;
+
+            // Coeficientes de variables
+            for (let i = 0; i < variableCount; i++) {
+                if (i > 0) {
+                    html += '<span class="text-muted">+</span>';
+                }
+                const savedValue = existingValues[i] || '1';
+                html += `
+                <div class="d-flex align-items-center">
+                    <input type="number" step="0.1" class="form-control form-control-sm constraint-coef" 
+                           style="width: 70px;" id="constraint_${constraintIndex}_coef_${i}" value="${savedValue}">
+                    <span class="ms-1 fw-bold text-success">x₍${i + 1}₎</span>
+                </div>`;
+            }
+
+            // Signo de la restricción y RHS
+            html += `
+                <select class="form-select form-select-sm constraint-sign" style="width: 80px;" id="constraint_${constraintIndex}_sign">
+                    <option value="<=" ${existingSign === '<=' ? 'selected' : ''}>&leq;</option>
+                    <option value=">=" ${existingSign === '>=' ? 'selected' : ''}>&geq;</option>
+                    <option value="=" ${existingSign === '=' ? 'selected' : ''}>=</option>
+                </select>
+                
+                <input type="number" step="0.1" class="form-control form-control-sm constraint-rhs" 
+                       style="width: 80px;" id="constraint_${constraintIndex}_rhs" value="${existingRHS}" placeholder="RHS">
+            </div>`;
+
+            cardBody.innerHTML = html;
+        });
     }
 
     // Generar función objetivo
@@ -582,9 +641,7 @@
             document.getElementById('constraint_1_rhs').value = '6';
             document.getElementById('constraint_1_sign').value = '<=';
         }
-    }
-
-    // Agregar nueva restricción
+    }    // Agregar nueva restricción
     function addConstraint() {
         const container = document.getElementById('constraints-container');
         const constraintIndex = constraintCount;
@@ -634,23 +691,50 @@
         constraintDiv.innerHTML = html;
         container.appendChild(constraintDiv);
         constraintCount++;
-    }
-
-    // Eliminar restricción
+    }    // Eliminar restricción
     function removeConstraint(index) {
         const constraint = document.getElementById(`constraint_${index}`);
         if (constraint) {
             constraint.remove();
-            updateConstraintLabels();
+            updateConstraintLabelsAndIds();
         }
     }
 
-    // Actualizar etiquetas de restricciones después de eliminar
-    function updateConstraintLabels() {
+    // Actualizar etiquetas e IDs de restricciones después de eliminar
+    function updateConstraintLabelsAndIds() {
         const constraints = document.querySelectorAll('#constraints-container .card');
+        constraintCount = constraints.length;
+
         constraints.forEach((constraint, index) => {
+            // Actualizar ID del contenedor
+            constraint.id = `constraint_${index}`;
+
+            // Actualizar título
             const title = constraint.querySelector('.card-title');
             title.innerHTML = `<i class="fas fa-equals me-1"></i>Restricción ${index + 1}`;
+
+            // Actualizar botón de eliminación
+            const deleteBtn = constraint.querySelector('.btn-outline-danger');
+            deleteBtn.setAttribute('onclick', `removeConstraint(${index})`);
+
+            // Actualizar IDs de los inputs y selects
+            const inputs = constraint.querySelectorAll('input[id^="constraint_"]');
+            inputs.forEach(input => {
+                const oldId = input.id;
+                const parts = oldId.split('_');
+                if (parts.length >= 3) {
+                    if (parts[2] === 'coef') {
+                        input.id = `constraint_${index}_coef_${parts[3]}`;
+                    } else if (parts[2] === 'rhs') {
+                        input.id = `constraint_${index}_rhs`;
+                    }
+                }
+            });
+
+            const select = constraint.querySelector('select[id^="constraint_"]');
+            if (select) {
+                select.id = `constraint_${index}_sign`;
+            }
         });
     }
 
