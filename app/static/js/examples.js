@@ -171,23 +171,115 @@ const examples = {
                 variables: [0, 0, 0]
             }
         }
-    ],
-    dosfases: [
-        // Puedes clonar los ejercicios de granm si se usa Dos Fases como alternativa
+    ], dosfases: [
+        {
+            name: "Ejercicio 1 - Dos Fases",
+            c: "1,2,3",
+            A: "1,1,0\n1,1,1\n1,0,1",
+            b: "2,3,4",
+            eq_constraints: "",
+            ge_constraints: "0,2",
+            minimize: true,
+            description: "Minimizar: 1x₁ + 2x₂ + 3x₃ con múltiples restricciones mixtas",
+            expected_solution: {
+                Z: 6,
+                variables: [3, 0, 1]
+            }
+        },
+        {
+            name: "Ejercicio 2 - Dos Fases",
+            c: "4,1",
+            A: "3,1\n4,3\n1,2",
+            b: "3,6,4",
+            eq_constraints: "0",
+            ge_constraints: "1",
+            minimize: true,
+            description: "Minimizar: 4x₁ + 1x₂ con mezcla de restricciones",
+            expected_solution: {
+                Z: 2,
+                variables: [0, 2]
+            }
+        },
+        {
+            name: "Ejercicio 3 - Dos Fases",
+            c: "3,5",
+            A: "2,3\n4,1",
+            b: "8,7",
+            eq_constraints: "",
+            ge_constraints: "",
+            minimize: false,
+            description: "Maximizar: 3x₁ + 5x₂ con restricciones ≤",
+            expected_solution: {
+                Z: 13.33,
+                variables: [1, "8/3"]
+            }
+        },
+        {
+            name: "Ejercicio 4 - Dos Fases",
+            c: "3,2,3,0",
+            A: "1,4,1,0\n2,1,0,1",
+            b: "7,10",
+            eq_constraints: "",
+            ge_constraints: "0,1",
+            minimize: true,
+            description: "Minimizar: 3x₁ + 2x₂ + 3x₃ con 4 variables",
+            expected_solution: {
+                Z: 35.5,
+                variables: [0, 11.75, 6, 8.25]
+            }
+        },
+        {
+            name: "Ejercicio 5 - Dos Fases",
+            c: "1,5,3",
+            A: "1,2,1\n2,-1,0",
+            b: "3,4",
+            eq_constraints: "0,1",
+            ge_constraints: "",
+            minimize: false,
+            description: "Maximizar: 1x₁ + 5x₂ + 3x₃ con igualdades",
+            expected_solution: {
+                Z: 5,
+                variables: [2, 0, 1]
+            }
+        },
+        {
+            name: "Ejercicio 6 - Dos Fases",
+            c: "2,2,4",
+            A: "2,1,1\n3,4,2",
+            b: "2,8",
+            eq_constraints: "",
+            ge_constraints: "1",
+            minimize: false,
+            description: "Maximizar: 2x₁ + 2x₂ + 4x₃ con mezcla de restricciones",
+            expected_solution: {
+                Z: 4,
+                variables: [0, 2, 0]
+            }
+        }
     ]
 };
 
-// Función genérica para mostrar la solución esperada
-function showExpectedSolutionGeneric(example) {
+// Hacer los ejemplos disponibles globalmente para uso en templates
+window.examples = examples;
+
+// Función genérica para mostrar la solución esperada (disponible globalmente)
+window.showExpectedSolutionGeneric = function (example) {
+    console.log('showExpectedSolutionGeneric called with:', example);
+
     const container = document.getElementById('expected-solution-container');
     const content = document.getElementById('expected-solution-content');
 
+    console.log('Container:', container);
+    console.log('Content:', content);
+
     // Solo proceder si existen los contenedores en el DOM
     if (!container || !content) {
+        console.error('Contenedores no encontrados en el DOM');
         return;
     }
 
     if (example.expected_solution) {
+        console.log('Showing expected solution:', example.expected_solution);
         const solution = example.expected_solution;
         let solutionHtml = '<div class="row">';
 
@@ -222,10 +314,12 @@ function showExpectedSolutionGeneric(example) {
 
         content.innerHTML = solutionHtml;
         container.style.display = 'block';
+        console.log('Expected solution displayed successfully');
     } else {
+        console.log('No expected solution to show');
         container.style.display = 'none';
     }
-}
+};
 
 // Función para cargar ejemplo en el formulario
 function loadExample(method, exampleIndex) {
@@ -269,14 +363,14 @@ function loadExample(method, exampleIndex) {
     const mField = document.getElementById('M');
     if (mField && method === 'granm') {
         mField.value = example.M || 1000;
-    }    // Limpiar campos de seguimiento de iteraciones si existe
+    }
+
+    // Limpiar campos de seguimiento de iteraciones si existe
     const trackIterationsCheckbox = document.getElementById('track_iterations');
     if (trackIterationsCheckbox) {
         trackIterationsCheckbox.checked = example.track_iterations || false;
-    }
-
-    // Mostrar solución esperada si existe y hay un contenedor para ello
-    showExpectedSolutionGeneric(example);
+    }    // Mostrar solución esperada si existe y hay un contenedor para ello
+    window.showExpectedSolutionGeneric(example);
 
     // Mostrar notificación
     showNotification(`Ejemplo cargado: ${example.name}`, 'success');
@@ -528,13 +622,10 @@ document.addEventListener('DOMContentLoaded', function () {
         currentMethod = 'granm';
     } else if (window.location.pathname.includes('dosfases')) {
         currentMethod = 'dosfases';
-    }
-
-    // Agregar botones de ejemplo si estamos en una página de método Y no existen ya
+    }    // Agregar botones de ejemplo si estamos en una página de método Y no existen ya
     if (currentMethod && examples[currentMethod]) {
         const form = document.querySelector('form');
         // Verificar si ya existen botones de ejemplo en el HTML
-        const existingExamples = document.querySelector('.form-label:contains("Ejemplos Rápidos"), .form-label[innerHTML*="Ejemplos Rápidos"], label[class*="form-label"]:has([class*="fa-star"])');
         const existingExamplesByText = Array.from(document.querySelectorAll('.form-label')).find(label =>
             label.textContent.includes('Ejemplos Rápidos')
         );

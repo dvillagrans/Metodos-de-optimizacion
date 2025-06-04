@@ -298,14 +298,27 @@ def resolver_dosfases():
     try:
         # Obtener datos del formulario
         form_data = {
-            'c': request.form['c'],
-            'A': request.form['A'],
-            'b': request.form['b'],
-            'eq_constraints': request.form['eq_constraints'],
+            'c': request.form.get('c', ''),
+            'A': request.form.get('A', ''),
+            'b': request.form.get('b', ''),
+            'eq_constraints': request.form.get('eq_constraints', ''),
             'ge_constraints': request.form.get('ge_constraints', ''),
             'minimize': request.form.get('minimize') == 'on',
             'track_iterations': request.form.get('track_iterations') == 'on'
         }
+        
+        # Validar que los campos requeridos no estén vacíos
+        if not form_data['c'].strip():
+            flash('La función objetivo es requerida', 'error')
+            return render_template('dosfases.html', form_data=form_data)
+        
+        if not form_data['A'].strip():
+            flash('La matriz de restricciones es requerida', 'error')
+            return render_template('dosfases.html', form_data=form_data)
+            
+        if not form_data['b'].strip():
+            flash('El vector b es requerido', 'error')
+            return render_template('dosfases.html', form_data=form_data)
         
         c = list(map(float, form_data['c'].split(',')))
         A_rows = form_data['A'].strip().split('\n')
@@ -321,23 +334,48 @@ def resolver_dosfases():
             ge_constraints = [int(x) for x in form_data['ge_constraints'].split(',')]
         
         minimize = form_data['minimize']
-        track_iterations = form_data['track_iterations']
-          # Resolver
+        track_iterations = form_data['track_iterations']        # Resolver
         if track_iterations:
             solution, optimal_value, tableau_history, pivot_history = dosfases_solver(
                 c, A, b, eq_constraints=eq_constraints, ge_constraints=ge_constraints, 
                 minimize=minimize, track_iterations=True
             )
-            # Convertir valores numpy a tipos nativos de Python antes de serializar
+            
+            # Verificar si la solución es válida
+            if solution is None or optimal_value is None:
+                flash('El problema no tiene solución factible', 'warning')
+                return render_template('dosfases.html', form_data=form_data)
+              # Convertir valores numpy a tipos nativos de Python antes de serializar
             resultado = {
                 'solution': [float(x) for x in solution],
                 'optimal_value': float(optimal_value),
-                'tableau_history': [t.tolist() for t in tableau_history],
-                'pivot_history': [[int(r), int(c)] for r, c in pivot_history],
+                'tableau_history': [t.tolist() for t in tableau_history] if tableau_history else [],
+                'pivot_history': [[int(r), int(c)] for r, c in pivot_history] if pivot_history else [],
                 'success': True
             }
+            
+            # Detectar soluciones múltiples si hay tableau_history
+            if tableau_history and len(tableau_history) > 0:
+                final_tableau = tableau_history[-1]
+                n_vars = len(c)
+                
+                # Usar el detector de soluciones múltiples
+                multiple_solutions_result = detect_multiple_solutions(final_tableau, n_vars, c, minimize)
+                formatted_result = format_multiple_solutions_result(multiple_solutions_result)
+                
+                # Convertir cualquier tipo numpy en los resultados de soluciones múltiples
+                formatted_result = convert_numpy_types(formatted_result)
+                
+                # Agregar información de soluciones múltiples al resultado
+                resultado.update(formatted_result)
         else:
             solution, optimal_value = dosfases_solver(c, A, b, eq_constraints=eq_constraints, ge_constraints=ge_constraints, minimize=minimize)
+            
+            # Verificar si la solución es válida
+            if solution is None or optimal_value is None:
+                flash('El problema no tiene solución factible', 'warning')
+                return render_template('dosfases.html', form_data=form_data)
+                
             resultado = {
                 'solution': [float(x) for x in solution],
                 'optimal_value': float(optimal_value),

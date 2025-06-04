@@ -26,19 +26,31 @@
                         <label class="form-label fw-bold">
                             <i class="fas fa-star text-warning me-1"></i>Ejemplos Rápidos:
                         </label>
-                        <div class="d-flex flex-wrap gap-2 mb-2">
-                            <button type="button" class="btn btn-outline-secondary btn-sm"
-                                onclick="loadExample('dosfases', 0)">
-                                <i class="fas fa-lightbulb me-1"></i>Ejemplo 1 - Básico
+                        <div class="d-flex flex-wrap gap-2 mb-2"> <button type="button"
+                                class="btn btn-outline-secondary btn-sm" onclick="loadDosFasesExample(0)">
+                                <i class="fas fa-lightbulb me-1"></i>Ejercicio 1
                             </button>
                             <button type="button" class="btn btn-outline-secondary btn-sm"
-                                onclick="loadExample('dosfases', 1)">
-                                <i class="fas fa-lightbulb me-1"></i>Ejemplo 2 - Complejo
+                                onclick="loadDosFasesExample(1)">
+                                <i class="fas fa-lightbulb me-1"></i>Ejercicio 2
                             </button>
                             <button type="button" class="btn btn-outline-secondary btn-sm"
-                                onclick="loadExample('dosfases', 2)">
-                                <i class="fas fa-lightbulb me-1"></i>Ejemplo 3 - Factibilidad
-                            </button> <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearForm()">
+                                onclick="loadDosFasesExample(2)">
+                                <i class="fas fa-lightbulb me-1"></i>Ejercicio 3
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="loadDosFasesExample(3)">
+                                <i class="fas fa-lightbulb me-1"></i>Ejercicio 4
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="loadDosFasesExample(4)">
+                                <i class="fas fa-lightbulb me-1"></i>Ejercicio 5
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="loadDosFasesExample(5)">
+                                <i class="fas fa-lightbulb me-1"></i>Ejercicio 6
+                            </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearForm()">
                                 <i class="fas fa-eraser me-1"></i>Limpiar
                             </button>
                         </div>
@@ -104,18 +116,9 @@
                                 <i class="fas fa-plus me-1"></i>Agregar Restricción
                             </button>
                         </div>
-                        <div id="constraints-container">
-                            <!-- Se generarán dinámicamente -->
+                        <div id="constraints-container"> <!-- Se generarán dinámicamente -->
                         </div>
                     </div>
-
-                    <!-- Campos hidden para compatibilidad -->
-                    <input type="hidden" id="c" name="c">
-                    <input type="hidden" id="A" name="A">
-                    <input type="hidden" id="b" name="b">
-                    <input type="hidden" id="eq_constraints" name="eq_constraints">
-                    <input type="hidden" id="ge_constraints" name="ge_constraints">
-                    <input type="hidden" id="minimize_hidden" name="minimize">
 
                     <!-- Opciones adicionales -->
                     <div class="row mb-4">
@@ -334,8 +337,7 @@
                             cardBody.innerHTML = html;
                         });
 
-                        // Agregar eventos de auto-guardado a los elementos actualizados
-                        addAutoSaveEvents();
+                        // Agregar eventos de auto-guardado a los elementos actualizados                        addAutoSaveEvents();
                     } function prepareFormData() {
                         // Preparar función objetivo
                         const c = [];
@@ -344,7 +346,17 @@
                             const val = input ? input.value : '';
                             c.push(val === '' ? 0 : parseFloat(val));
                         }
-                        document.getElementById('c').value = c.join(',');
+
+                        // Crear o actualizar campo oculto para c
+                        let cField = document.getElementById('c_hidden');
+                        if (!cField) {
+                            cField = document.createElement('input');
+                            cField.type = 'hidden';
+                            cField.name = 'c';
+                            cField.id = 'c_hidden';
+                            document.getElementById('dosfasesForm').appendChild(cField);
+                        }
+                        cField.value = c.join(',');
 
                         // Preparar restricciones
                         const A = [];
@@ -363,8 +375,8 @@
                             A.push(row);
 
                             const rhsInput = constraint.querySelector(`#constraint_${index}_rhs`);
-                            const bVal = rhsInput ? rhsInput.value : '';
-                            b.push(bVal === '' ? 0 : parseFloat(bVal));
+                            const rhsVal = rhsInput ? rhsInput.value : '';
+                            b.push(rhsVal === '' ? 0 : parseFloat(rhsVal));
 
                             const signSelect = constraint.querySelector(`#constraint_${index}_sign`);
                             const sign = signSelect ? signSelect.value : '<=';
@@ -375,62 +387,160 @@
                             }
                         });
 
-                        document.getElementById('A').value = A.map(row => row.join(',')).join('\n');
-                        document.getElementById('b').value = b.join(',');
-                        document.getElementById('eq_constraints').value = eqConstraints.join(',');
-                        document.getElementById('ge_constraints').value = geConstraints.join(',');
+                        // Crear o actualizar campos ocultos
+                        let aField = document.getElementById('A_hidden');
+                        if (!aField) {
+                            aField = document.createElement('input');
+                            aField.type = 'hidden';
+                            aField.name = 'A';
+                            aField.id = 'A_hidden';
+                            document.getElementById('dosfasesForm').appendChild(aField);
+                        }
+                        aField.value = A.map(row => row.join(',')).join('\n');
+
+                        let bField = document.getElementById('b_hidden');
+                        if (!bField) {
+                            bField = document.createElement('input');
+                            bField.type = 'hidden';
+                            bField.name = 'b';
+                            bField.id = 'b_hidden';
+                            document.getElementById('dosfasesForm').appendChild(bField);
+                        }
+                        bField.value = b.join(',');
+
+                        let eqField = document.getElementById('eq_constraints_hidden');
+                        if (!eqField) {
+                            eqField = document.createElement('input');
+                            eqField.type = 'hidden';
+                            eqField.name = 'eq_constraints';
+                            eqField.id = 'eq_constraints_hidden';
+                            document.getElementById('dosfasesForm').appendChild(eqField);
+                        }
+                        eqField.value = eqConstraints.join(',');
+
+                        let geField = document.getElementById('ge_constraints_hidden');
+                        if (!geField) {
+                            geField = document.createElement('input');
+                            geField.type = 'hidden';
+                            geField.name = 'ge_constraints';
+                            geField.id = 'ge_constraints_hidden';
+                            document.getElementById('dosfasesForm').appendChild(geField);
+                        }
+                        geField.value = geConstraints.join(',');
 
                         // Preparar objetivo (minimizar/maximizar)
                         const isMinimize = document.querySelector('input[name="objective_type"]:checked').value === 'minimize';
-                        document.getElementById('minimize_hidden').value = isMinimize ? '1' : '0';
+                        let minimizeHidden = document.getElementById('minimize_hidden');
+                        if (!minimizeHidden) {
+                            minimizeHidden = document.createElement('input');
+                            minimizeHidden.type = 'hidden';
+                            minimizeHidden.name = 'minimize';
+                            minimizeHidden.id = 'minimize_hidden';
+                            document.getElementById('dosfasesForm').appendChild(minimizeHidden);
+                        }
+                        minimizeHidden.value = isMinimize ? '1' : '0';
                     }
 
-                    function loadExample(method, exampleIndex) {
-                        if (method === 'dosfases') {
-                            switch (exampleIndex) {
-                                case 0:
-                                    // Ejemplo 1 - Básico
-                                    variableCount = 3;
-                                    updateButtonGroup();
-                                    updateObjectiveFunction();
-                                    clearConstraints();
+                    function loadDosFasesExample(exampleIndex) {
+                        console.log('loadDosFasesExample called with:', exampleIndex);
+                        console.log('window.examples:', !!window.examples);
+                        console.log('window.examples.dosfases:', !!window.examples?.dosfases);
+                        if (window.examples && window.examples.dosfases) {
+                            const example = window.examples.dosfases[exampleIndex];
+                            console.log('Found example:', example);
 
-                                    // Función objetivo: 3x₁ + 2x₂ + x₃
-                                    setTimeout(() => {
-                                        document.getElementById('objective_coef_0').value = 3;
-                                        document.getElementById('objective_coef_1').value = 2;
-                                        document.getElementById('objective_coef_2').value = 1;
-
-                                        // Añadir restricciones
-                                        addConstraint();
-                                        addConstraint();
-                                        addConstraint();
-
-                                        setTimeout(() => {
-                                            // x₁ + 2x₂ + x₃ = 12
-                                            document.getElementById('constraint_0_coef_0').value = 1;
-                                            document.getElementById('constraint_0_coef_1').value = 2;
-                                            document.getElementById('constraint_0_coef_2').value = 1;
-                                            document.getElementById('constraint_0_sign').value = '=';
-                                            document.getElementById('constraint_0_rhs').value = 12;
-
-                                            // 2x₁ + x₂ + 3x₃ ≤ 8
-                                            document.getElementById('constraint_1_coef_0').value = 2;
-                                            document.getElementById('constraint_1_coef_1').value = 1;
-                                            document.getElementById('constraint_1_coef_2').value = 3;
-                                            document.getElementById('constraint_1_sign').value = '<=';
-                                            document.getElementById('constraint_1_rhs').value = 8;
-
-                                            // x₁ + x₂ + x₃ ≥ 6
-                                            document.getElementById('constraint_2_coef_0').value = 1;
-                                            document.getElementById('constraint_2_coef_1').value = 1;
-                                            document.getElementById('constraint_2_coef_2').value = 1;
-                                            document.getElementById('constraint_2_sign').value = '>=';
-                                            document.getElementById('constraint_2_rhs').value = 6;
-                                        }, 100);
-                                    }, 100);
-                                    break;
+                            if (!example) {
+                                console.error('Ejemplo no encontrado:', exampleIndex);
+                                return;
                             }
+
+                            // Configurar número de variables según el ejemplo
+                            const cValues = example.c.split(',');
+                            const newVariableCount = cValues.length;
+
+                            if (variableCount !== newVariableCount) {
+                                variableCount = newVariableCount;
+                                updateButtonGroup();
+                                updateObjectiveFunction();
+                            }
+
+                            // Limpiar restricciones existentes
+                            clearConstraints();
+
+                            // Configurar objetivo (maximizar/minimizar)
+                            const objectiveType = example.minimize ? 'minimize' : 'maximize';
+                            document.querySelector(`input[name="objective_type"][value="${objectiveType}"]`).checked = true;
+
+                            // Configurar función objetivo con timeout para asegurar que los elementos estén listos
+                            setTimeout(() => {
+                                cValues.forEach((value, index) => {
+                                    const input = document.getElementById(`objective_coef_${index}`);
+                                    if (input) {
+                                        input.value = parseFloat(value);
+                                    }
+                                });
+
+                                // Cargar restricciones
+                                const AMatrix = example.A.split('\n');
+                                const bValues = example.b.split(',');
+                                const eqConstraints = example.eq_constraints ? example.eq_constraints.split(',').map(i => parseInt(i)) : [];
+                                const geConstraints = example.ge_constraints ? example.ge_constraints.split(',').map(i => parseInt(i)) : [];
+
+                                // Añadir restricciones una por una
+                                AMatrix.forEach((row, index) => {
+                                    addConstraint();
+                                });
+
+                                // Configurar restricciones con otro timeout
+                                setTimeout(() => {
+                                    AMatrix.forEach((row, index) => {
+                                        const coefficients = row.split(',');
+
+                                        // Llenar coeficientes
+                                        coefficients.forEach((coeff, coeffIndex) => {
+                                            const input = document.getElementById(`constraint_${index}_coef_${coeffIndex}`);
+                                            if (input) {
+                                                input.value = parseFloat(coeff);
+                                            }
+                                        });
+
+                                        // Configurar valor b
+                                        const rhsInput = document.getElementById(`constraint_${index}_rhs`);
+                                        if (rhsInput) {
+                                            rhsInput.value = parseFloat(bValues[index]);
+                                        }
+
+                                        // Configurar tipo de restricción
+                                        const signSelect = document.getElementById(`constraint_${index}_sign`);
+                                        if (signSelect) {
+                                            let constraintType = '<='; // Por defecto
+                                            if (eqConstraints.includes(index)) {
+                                                constraintType = '=';
+                                            } else if (geConstraints.includes(index)) {
+                                                constraintType = '>=';
+                                            }
+                                            signSelect.value = constraintType;
+                                        }
+                                    });                                    // Mostrar solución esperada si existe
+                                    console.log('Checking showExpectedSolutionGeneric...', !!window.showExpectedSolutionGeneric);
+                                    console.log('Example:', example);
+                                    console.log('Expected solution:', example.expected_solution);
+
+                                    if (window.showExpectedSolutionGeneric) {
+                                        window.showExpectedSolutionGeneric(example);
+                                    } else {
+                                        console.error('showExpectedSolutionGeneric not available');
+                                    }
+
+                                    // Mostrar notificación
+                                    console.log(`Ejemplo cargado: ${example.name}`);
+                                }, 200);
+                            }, 100);
+                        } else {
+                            console.error('Conditions not met:', {
+                                hasWindowExamples: !!window.examples,
+                                hasDosfasesExamples: !!window.examples?.dosfases
+                            });
                         }
                         saveFormDataToLocalStorage();
                     }
@@ -439,6 +549,13 @@
                         clearConstraints();
                         updateObjectiveFunction();
                         document.querySelector('input[name="objective_type"][value="maximize"]').checked = true;
+
+                        // Ocultar solución esperada
+                        const expectedSolutionContainer = document.getElementById('expected-solution-container');
+                        if (expectedSolutionContainer) {
+                            expectedSolutionContainer.style.display = 'none';
+                        }
+
                         saveFormDataToLocalStorage();
                     }
 
@@ -467,13 +584,10 @@
                         updateObjectiveFunction();
                         addConstraint(); // Agregar una restricción por defecto
                     });
-                    document.getElementById('track_iterations').checked = false;
-
-
-                    // Preparar datos antes de enviar el formulario
-                    document.getElementById('doseasesForm').addEventListener('submit', function (e) {
+                    document.getElementById('track_iterations').checked = false;                    // Preparar datos antes de enviar el formulario
+                    document.getElementById('dosfasesForm').addEventListener('submit', function (e) {
                         prepareFormData();
-                    }); // Inicializar la interfaz
+                    });// Inicializar la interfaz
                     document.addEventListener('DOMContentLoaded', function () {
                         // Verificar si hay datos del formulario para restaurar
                         restoreFormDataDosFases();
@@ -885,10 +999,8 @@
                 </div>
             </div>
         </div>
-        {% endif %}
-
-        <!-- Sección de Iteraciones del Algoritmo movida al lado -->
-        {% if resultado.tableau_history %}
+        {% endif %} <!-- Sección de Iteraciones del Algoritmo movida al lado -->
+        {% if resultado and resultado.tableau_history and resultado.tableau_history|length > 0 %}
         <div class="card mt-3">
             <div class="card-header bg-info text-white">
                 <h6 class="mb-0">
@@ -914,8 +1026,8 @@
                                 <span class="badge me-2 {{ 'bg-warning text-dark' if is_phase_1 else 'bg-primary' }}">
                                     {{ 'Fase I' if is_phase_1 else 'Fase II' }}
                                 </span>
-                                Iteración {{ i + 1 }}
-                                {% if i < resultado.pivot_history|length %} <small class="ms-2 text-muted">
+                                Iteración {{ i + 1 }} {% if resultado.pivot_history and i <
+                                    resultado.pivot_history|length %} <small class="ms-2 text-muted">
                                     (Pivote: fila {{ resultado.pivot_history[i][0] }}, columna {{
                                     resultado.pivot_history[i][1] }})
                                     </small>
@@ -931,7 +1043,7 @@
                                         <tr>
                                             {% for col_idx in range(resultado.tableau_history[i][row_idx]|length) %}
                                             <td
-                                                class="{% if i < resultado.pivot_history|length and row_idx == resultado.pivot_history[i][0] and col_idx == resultado.pivot_history[i][1] %}pivot-cell{% endif %}">
+                                                class="{% if resultado.pivot_history and i < resultado.pivot_history|length and row_idx == resultado.pivot_history[i][0] and col_idx == resultado.pivot_history[i][1] %}pivot-cell{% endif %}">
                                                 {{ "%.3f"|format(resultado.tableau_history[i][row_idx][col_idx]) }}
                                             </td>
                                             {% endfor %}
