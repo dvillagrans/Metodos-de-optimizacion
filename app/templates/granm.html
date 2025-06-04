@@ -402,9 +402,8 @@
     let variableCount = 2;
     let constraintCount = 2;    // Inicializar el formulario cuando se carga la página
     document.addEventListener('DOMContentLoaded', function () {
-        // Verificar si hay datos del formulario para restaurar
-        restoreFormDataGranM();
         initializeFormGranM();
+        restoreFormDataGranM();
     });
 
     // Función para restaurar datos del formulario después de resolver (Gran M)
@@ -496,7 +495,9 @@
                     }
                 });
             }, 100);
+            return true;
         }
+        return false;
     }
 
     // Inicializar formulario con valores por defecto para Gran M

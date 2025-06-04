@@ -158,26 +158,34 @@ def resolver_granm_api():
         if not all([c, A, b]):
             return jsonify({'error': 'Faltan datos requeridos (c, A, b)'}), 400
 
-        # Resolver
         if track_iterations:
             sol, z, T_hist, piv_hist = granm_solver(
                 c, A, b, sense,
                 minimize=minimize, track_iterations=True, M=M
             )
+            resultado = {
+                'solution': sol.tolist(),
+                'optimal_value': float(z),
+                'tableau_history': [t.tolist() for t in T_hist],
+                'pivot_history': [[int(r), int(c)] for r, c in piv_hist],
+                'success': True
+            }
+
+            # Detectar soluciones múltiples
+            final_tableau = T_hist[-1]
+            n_vars = len(c)
+            mult_result = detect_multiple_solutions(final_tableau, n_vars)
+            formatted_mult = format_multiple_solutions_result(mult_result)
+            resultado.update(convert_numpy_types(formatted_mult))
+
         else:
-            resultado = granm_solver.solve(c, A, b, sense, minimize=minimize, M=M)
+            sol, z = granm_solver(c, A, b, sense, minimize=minimize, M=M)
+            resultado = {
+                'solution': sol.tolist(),
+                'optimal_value': float(z),
+                'success': True
+            }
 
-        # Detectar soluciones múltiples si hay tableau final
-        if 'tableau_final' in resultado:
-            multiple_info = detect_multiple_solutions(
-                resultado['tableau_final'], 
-                len(c), 
-                c, 
-                minimize
-            )
-            resultado['multiple_solutions'] = format_multiple_solutions_result(multiple_info)
-
-        # Convertir tipos numpy
         resultado = convert_numpy_types(resultado)
         return jsonify(resultado)
 

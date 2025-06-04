@@ -173,12 +173,14 @@ def resolver_granm():
         M_str   = request.form.get('M', '1e6')
 
         form_data = {
-            'c' : c_str, 'A' : A_str, 'b' : b_str,
-            'eq_constraints': eq_str,
-            'ge_constraints': ge_str,
-            'minimize': bool(min_sw),
-            'track_iterations': bool(iter_sw),
-            'M': M_str
+            "c": request.form.get("c"),
+            "A": request.form.get("A"),
+            "b": request.form.get("b"),
+            "M": request.form.get("M"),
+            "eq_constraints": request.form.get("eq_constraints"),
+            "ge_constraints": request.form.get("ge_constraints"),
+            "minimize": request.form.get("minimize"),
+            "track_iterations": request.form.get("track_iterations")
         }
 
         # ── 2. Parseo de listas numéricas ───────────────
@@ -194,7 +196,8 @@ def resolver_granm():
         m = len(b)
         eq_idxs = [int(i) for i in eq_str.split(',') if i.strip().isdigit()]
         ge_idxs = [int(i) for i in ge_str.split(',') if i.strip().isdigit()]
-
+        
+        minimize = bool(min_sw)  
         sense = ['≤'] * m
         for i in eq_idxs:
             if 0 <= i < m:
@@ -202,7 +205,8 @@ def resolver_granm():
         for i in ge_idxs:
             if 0 <= i < m:
                 sense[i] = '≥'
-                minimize = bool(min_sw)
+               
+             
         track_iterations = bool(iter_sw)
         M_val = float(M_str)
 
