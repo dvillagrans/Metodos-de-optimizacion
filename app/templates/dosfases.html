@@ -20,317 +20,460 @@
                 </h5>
             </div>
             <div class="card-body">
-                <!-- Interfaz Dinámica Mejorada -->
-                <div class="mb-4">
-                    <label class="form-label fw-bold">Número de Variables:</label>
-                    <div class="input-group mb-3" style="max-width: 150px;">
-                        <input type="number" class="form-control" id="numVariables" min="2" max="10" value="2">
-                        <button class="btn btn-outline-secondary" type="button" onclick="updateVariables()">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
-                    </div>
-                </div>
+                <form method="POST" action="{{ url_for('main.resolver_dosfases') }}" id="dosfasesForm">
+                    <!-- Botones de ejemplo -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-star text-warning me-1"></i>Ejemplos Rápidos:
+                        </label>
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="loadExample('dosfases', 0)">
+                                <i class="fas fa-lightbulb me-1"></i>Ejemplo 1 - Básico
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="loadExample('dosfases', 1)">
+                                <i class="fas fa-lightbulb me-1"></i>Ejemplo 2 - Complejo
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="loadExample('dosfases', 2)">
+                                <i class="fas fa-lightbulb me-1"></i>Ejemplo 3 - Factibilidad
+                            </button> <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearForm()">
+                                <i class="fas fa-eraser me-1"></i>Limpiar
+                            </button>
+                        </div>
 
-                <form method="POST" action="{{ url_for('main.resolver_dosfases') }}" id="doseasesForm">
+                        <!-- Solución Esperada -->
+                        <div id="expected-solution-container" class="mt-2" style="display: none;">
+                            <div class="alert alert-info mb-0">
+                                <h6 class="alert-heading mb-2">
+                                    <i class="fas fa-info-circle me-1"></i>Solución Esperada:
+                                </h6>
+                                <div id="expected-solution-content"></div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Función Objetivo -->
                     <div class="mb-4">
                         <label class="form-label fw-bold">
-                            <i class="fas fa-bullseye me-2"></i>Función Objetivo:
+                            <i class="fas fa-target me-1 text-warning"></i>Función Objetivo
                         </label>
-                        <div class="objective-container">
-                            <div class="row align-items-center mb-2">
-                                <div class="col-auto">Z =</div>
-                                <div class="col" id="objectiveInputs"></div>
+                        <div class="card bg-light">
+                            <div class="card-body p-3">
+                                <div class="d-flex align-items-center mb-2">
+                                    <span class="me-2 fw-bold">Objetivo:</span>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="objective_type" id="maximize"
+                                            value="maximize" checked>
+                                        <label class="form-check-label" for="maximize">Maximizar</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="objective_type" id="minimize"
+                                            value="minimize">
+                                        <label class="form-check-label" for="minimize">Minimizar</label>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center mb-2">
+                                    <span class="me-2">Variables:</span>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-secondary"
+                                            onclick="changeVariableCount(2)">2 variables</button>
+                                        <button type="button" class="btn btn-outline-secondary active"
+                                            onclick="changeVariableCount(3)">3 variables</button>
+                                        <button type="button" class="btn btn-outline-secondary"
+                                            onclick="changeVariableCount(4)">4 variables</button>
+                                        <button type="button" class="btn btn-outline-secondary"
+                                            onclick="changeVariableCount(5)">5 variables</button>
+                                    </div>
+                                </div>
+                                <div id="objective-function" class="d-flex flex-wrap align-items-center gap-2">
+                                    <!-- Se generará dinámicamente -->
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Restricciones -->
                     <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
                             <label class="form-label fw-bold mb-0">
-                                <i class="fas fa-equals me-2"></i>Restricciones:
+                                <i class="fas fa-list me-1 text-success"></i>Restricciones
                             </label>
-                            <div>
-                                <button type="button" class="btn btn-sm btn-success me-1" onclick="addConstraint()">
-                                    <i class="fas fa-plus me-1"></i>Agregar
-                                </button>
-                                <button type="button" class="btn btn-sm btn-danger" onclick="removeConstraint()">
-                                    <i class="fas fa-minus me-1"></i>Quitar
-                                </button>
-                            </div>
+                            <button type="button" class="btn btn-success btn-sm" onclick="addConstraint()">
+                                <i class="fas fa-plus me-1"></i>Agregar Restricción
+                            </button>
                         </div>
-                        <div id="constraintsContainer"></div>
+                        <div id="constraints-container">
+                            <!-- Se generarán dinámicamente -->
+                        </div>
                     </div>
 
-                    <!-- Campos ocultos para el formulario tradicional -->
+                    <!-- Campos hidden para compatibilidad -->
                     <input type="hidden" id="c" name="c">
                     <input type="hidden" id="A" name="A">
                     <input type="hidden" id="b" name="b">
                     <input type="hidden" id="eq_constraints" name="eq_constraints">
                     <input type="hidden" id="ge_constraints" name="ge_constraints">
-                    <div class="row">
+                    <input type="hidden" id="minimize_hidden" name="minimize">
+
+                    <!-- Opciones adicionales -->
+                    <div class="row mb-4">
                         <div class="col-md-6">
-                            <div class="form-check mb-3">
-                                <input class="form-check-input" type="checkbox" id="minimize" name="minimize"
-                                    {{ 'checked' if form_data and form_data.minimize else '' }}>
-                                <label class="form-check-label" for="minimize">
-                                    Minimizar (por defecto se maximiza)
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-check mb-3">
+                            <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="track_iterations"
-                                    name="track_iterations" {{ 'checked' if form_data and form_data.track_iterations
-                                    else '' }}>
+                                    name="track_iterations" checked>
                                 <label class="form-check-label" for="track_iterations">
-                                    Mostrar iteraciones
+                                    <i class="fas fa-history me-1"></i>Mostrar iteraciones del algoritmo
                                 </label>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Botones de Acción -->
+                    <!-- Botones de acción -->
                     <div class="row">
-                        <div class="col-md-4 mb-2">
+                        <div class="col-md-6 mb-2">
                             <button type="submit" class="btn btn-warning text-dark w-100">
                                 <i class="fas fa-calculator me-2"></i>Resolver
                             </button>
                         </div>
-                        <div class="col-md-4 mb-2">
-                            <button type="button" class="btn btn-outline-primary w-100" onclick="loadExample()">
-                                <i class="fas fa-lightbulb me-2"></i>Ejemplo
-                            </button>
-                        </div>
-                        <div class="col-md-4 mb-2">
+                        <div class="col-md-6 mb-2">
                             <button type="button" class="btn btn-outline-secondary w-100" onclick="clearForm()">
                                 <i class="fas fa-eraser me-2"></i>Limpiar
                             </button>
                         </div>
                     </div>
-                </form>
-
-                <!-- Scripts JavaScript para la interfaz dinámica -->
+                </form> <!-- Scripts JavaScript para la interfaz dinámica -->
                 <script>
-                    let numVars = 2;
-                    let numConstraints = 3;
+                    // Variables globales
+                    let variableCount = 3;
+                    let constraintCount = 0;
 
-                    function updateVariables() {
-                        numVars = parseInt(document.getElementById('numVariables').value);
-                        if (numVars < 2) numVars = 2;
-                        if (numVars > 10) numVars = 10;
-                        document.getElementById('numVariables').value = numVars;
+                    // Función para cambiar el número de variables
+                    function changeVariableCount(count) {
+                        variableCount = count;
 
-                        generateObjectiveInputs();
-                        generateConstraintInputs();
+                        // Actualizar botones activos
+                        document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+                        event.target.classList.add('active');
+
+                        updateObjectiveFunction();
+                        updateAllConstraints();
+
+                        // Guardar los cambios en localStorage
+                        setTimeout(() => {
+                            saveFormDataToLocalStorage();
+                        }, 100);
                     }
 
-                    function generateObjectiveInputs() {
-                        const container = document.getElementById('objectiveInputs');
+                    // Función para agregar eventos de auto-guardado a elementos
+                    function addAutoSaveEvents(container = document) {
+                        const inputs = container.querySelectorAll('input, select');
+                        inputs.forEach(input => {
+                            input.addEventListener('change', saveFormDataToLocalStorage);
+                        });
+                    }
+
+                    // Función debounce para evitar guardado excesivo
+                    function debounce(func, wait) {
+                        let timeout;
+                        return function executedFunction(...args) {
+                            const later = () => {
+                                clearTimeout(timeout);
+                                func(...args);
+                            };
+                            clearTimeout(timeout);
+                            timeout = setTimeout(later, wait);
+                        };
+                    }
+
+                    // Función para actualizar la función objetivo
+                    function updateObjectiveFunction() {
+                        const container = document.getElementById('objective-function');
                         container.innerHTML = '';
 
-                        for (let i = 0; i < numVars; i++) {
+                        for (let i = 0; i < variableCount; i++) {
                             const wrapper = document.createElement('div');
-                            wrapper.className = 'coefficient-group d-inline-block me-2 mb-2';
+                            wrapper.className = 'd-flex align-items-center';
+
+                            if (i > 0) {
+                                const plus = document.createElement('span');
+                                plus.className = 'me-2 text-warning fw-bold';
+                                plus.textContent = '+';
+                                wrapper.appendChild(plus);
+                            }
 
                             const input = document.createElement('input');
                             input.type = 'number';
                             input.step = 'any';
-                            input.className = 'form-control form-control-sm';
-                            input.style.width = '70px';
+                            input.className = 'form-control form-control-sm me-2';
+                            input.style.width = '80px';
                             input.placeholder = '0';
-                            input.id = `c_${i}`;
+                            input.id = `objective_coef_${i}`;
 
-                            const label = document.createElement('label');
-                            label.className = 'form-label-sm ms-1';
+                            const label = document.createElement('span');
+                            label.className = 'text-warning fw-bold me-2';
                             label.textContent = `x₍${i + 1}₎`;
 
                             wrapper.appendChild(input);
                             wrapper.appendChild(label);
                             container.appendChild(wrapper);
-
-                            if (i < numVars - 1) {
-                                const plus = document.createElement('span');
-                                plus.className = 'me-2';
-                                plus.textContent = '+';
-                                container.appendChild(plus);
-                            }
                         }
-                    }
 
-                    function generateConstraintInputs() {
-                        const container = document.getElementById('constraintsContainer');
-                        container.innerHTML = '';
-
-                        for (let i = 0; i < numConstraints; i++) {
-                            addConstraintRow(i);
-                        }
-                    }
-
-                    function addConstraintRow(index) {
-                        const container = document.getElementById('constraintsContainer');
-                        const row = document.createElement('div');
-                        row.className = 'constraint-row mb-3 p-3 border rounded';
-                        row.id = `constraint_${index}`;
-
-                        let html = `<div class="row align-items-center">`;
-
-                        // Coeficientes
-                        html += '<div class="col-md-7">';
-                        for (let j = 0; j < numVars; j++) {
-                            html += `
-                            <div class="coefficient-group d-inline-block me-2 mb-2">
-                                <input type="number" step="any" class="form-control form-control-sm" 
-                                       style="width: 70px;" placeholder="0" id="a_${index}_${j}">
-                                <label class="form-label-sm ms-1">x₍${j + 1}₎</label>
-                            </div>
-                        `;
-                            if (j < numVars - 1) {
-                                html += '<span class="me-2">+</span>';
-                            }
-                        }
-                        html += '</div>';
-
-                        // Signo de restricción
-                        html += `
-                        <div class="col-md-2">
-                            <select class="form-select form-select-sm" id="sign_${index}">
-                                <option value="<=">&le;</option>
-                                <option value=">=">&ge;</option>
-                                <option value="=">=</option>
-                            </select>
-                        </div>
-                    `;
-
-                        // Valor del lado derecho
-                        html += `
-                        <div class="col-md-3">
-                            <input type="number" step="any" class="form-control form-control-sm" 
-                                   placeholder="0" id="b_${index}">
-                        </div>
-                    `;
-
-                        html += '</div>';
-                        row.innerHTML = html;
-                        container.appendChild(row);
-                    }
-
+                        // Agregar eventos de auto-guardado a los nuevos inputs
+                        addAutoSaveEvents(container);
+                    }                    // Función para agregar nueva restricción
                     function addConstraint() {
-                        if (numConstraints < 10) {
-                            addConstraintRow(numConstraints);
-                            numConstraints++;
+                        const container = document.getElementById('constraints-container');
+                        const constraintIndex = constraintCount;
+
+                        const constraintDiv = document.createElement('div');
+                        constraintDiv.className = 'card mb-2';
+                        constraintDiv.id = `constraint_${constraintIndex}`;
+
+                        let html = `
+                        <div class="card-body p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-bold text-success">Restricción ${constraintIndex + 1}</span>
+                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeConstraint(${constraintIndex})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <div class="d-flex flex-wrap align-items-center gap-2">`;
+
+                        // Coeficientes de variables
+                        for (let i = 0; i < variableCount; i++) {
+                            if (i > 0) {
+                                html += `<span class="text-warning fw-bold">+</span>`;
+                            }
+                            html += `
+                            <input type="number" step="any" class="form-control form-control-sm constraint-coef" 
+                                   style="width: 80px;" placeholder="0" id="constraint_${constraintIndex}_coef_${i}">
+                            <span class="text-warning fw-bold">x₍${i + 1}₎</span>`;
+                        }
+
+                        // Signo de la restricción (para dos fases, típicamente =)
+                        html += `
+                                <select class="form-select form-select-sm constraint-sign" style="width: 80px;" id="constraint_${constraintIndex}_sign">
+                                    <option value="<=">&le;</option>
+                                    <option value=">=">&ge;</option>
+                                    <option value="=" selected>=</option>
+                                </select>
+                                <input type="number" step="any" class="form-control form-control-sm constraint-rhs" 
+                                       style="width: 80px;" placeholder="0" id="constraint_${constraintIndex}_rhs">
+                            </div>
+                        </div>`;
+
+                        constraintDiv.innerHTML = html;
+                        container.appendChild(constraintDiv);
+                        constraintCount++;
+
+                        // Agregar eventos de auto-guardado a los nuevos inputs
+                        addAutoSaveEvents(constraintDiv);
+
+                        // Guardar cambios en localStorage
+                        setTimeout(() => {
+                            saveFormDataToLocalStorage();
+                        }, 100);
+                    }
+
+                    // Función para eliminar restricción
+                    function removeConstraint(index) {
+                        const constraint = document.getElementById(`constraint_${index}`);
+                        if (constraint) {
+                            constraint.remove();
+                            updateConstraintLabels();
+                            saveFormDataToLocalStorage();
                         }
                     }
 
-                    function removeConstraint() {
-                        if (numConstraints > 1) {
-                            numConstraints--;
-                            const row = document.getElementById(`constraint_${numConstraints}`);
-                            if (row) row.remove();
-                        }
+                    // Función para actualizar etiquetas de restricciones
+                    function updateConstraintLabels() {
+                        const constraints = document.querySelectorAll('#constraints-container .card');
+                        constraints.forEach((constraint, index) => {
+                            const label = constraint.querySelector('.fw-bold.text-success');
+                            if (label) {
+                                label.textContent = `Restricción ${index + 1}`;
+                            }
+                        });
                     }
 
-                    function prepareFormData() {
-                        // Función objetivo
+                    // Función para actualizar todas las restricciones cuando cambia el número de variables
+                    function updateAllConstraints() {
+                        const constraints = document.querySelectorAll('#constraints-container .card');
+                        constraints.forEach((constraint, constraintIndex) => {
+                            const cardBody = constraint.querySelector('.card-body');
+                            let html = `
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-bold text-success">Restricción ${constraintIndex + 1}</span>
+                                <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeConstraint(${constraintIndex})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <div class="d-flex flex-wrap align-items-center gap-2">`;
+
+                            for (let i = 0; i < variableCount; i++) {
+                                if (i > 0) {
+                                    html += `<span class="text-warning fw-bold">+</span>`;
+                                }
+                                html += `
+                                <input type="number" step="any" class="form-control form-control-sm constraint-coef" 
+                                       style="width: 80px;" placeholder="0" id="constraint_${constraintIndex}_coef_${i}">
+                                <span class="text-warning fw-bold">x₍${i + 1}₎</span>`;
+                            }
+
+                            html += `
+                                <select class="form-select form-select-sm constraint-sign" style="width: 80px;" id="constraint_${constraintIndex}_sign">
+                                    <option value="<=">&le;</option>
+                                    <option value=">=">&ge;</option>
+                                    <option value="=" selected>=</option>
+                                </select>
+                                <input type="number" step="any" class="form-control form-control-sm constraint-rhs" 
+                                       style="width: 80px;" placeholder="0" id="constraint_${constraintIndex}_rhs">
+                            </div>`;
+                            cardBody.innerHTML = html;
+                        });
+
+                        // Agregar eventos de auto-guardado a los elementos actualizados
+                        addAutoSaveEvents();
+                    } function prepareFormData() {
+                        // Preparar función objetivo
                         const c = [];
-                        for (let i = 0; i < numVars; i++) {
-                            const val = document.getElementById(`c_${i}`).value;
+                        for (let i = 0; i < variableCount; i++) {
+                            const input = document.getElementById(`objective_coef_${i}`);
+                            const val = input ? input.value : '';
                             c.push(val === '' ? 0 : parseFloat(val));
                         }
                         document.getElementById('c').value = c.join(',');
 
-                        // Matriz A y vector b
+                        // Preparar restricciones
                         const A = [];
                         const b = [];
                         const eqConstraints = [];
                         const geConstraints = [];
 
-                        for (let i = 0; i < numConstraints; i++) {
+                        const constraints = document.querySelectorAll('#constraints-container .card');
+                        constraints.forEach((constraint, index) => {
                             const row = [];
-                            for (let j = 0; j < numVars; j++) {
-                                const val = document.getElementById(`a_${i}_${j}`).value;
+                            for (let j = 0; j < variableCount; j++) {
+                                const input = constraint.querySelector(`#constraint_${index}_coef_${j}`);
+                                const val = input ? input.value : '';
                                 row.push(val === '' ? 0 : parseFloat(val));
                             }
                             A.push(row);
 
-                            const bVal = document.getElementById(`b_${i}`).value;
+                            const rhsInput = constraint.querySelector(`#constraint_${index}_rhs`);
+                            const bVal = rhsInput ? rhsInput.value : '';
                             b.push(bVal === '' ? 0 : parseFloat(bVal));
 
-                            const sign = document.getElementById(`sign_${i}`).value;
+                            const signSelect = constraint.querySelector(`#constraint_${index}_sign`);
+                            const sign = signSelect ? signSelect.value : '<=';
                             if (sign === '=') {
-                                eqConstraints.push(i);
+                                eqConstraints.push(index);
                             } else if (sign === '>=') {
-                                geConstraints.push(i);
+                                geConstraints.push(index);
                             }
-                        }
+                        });
 
                         document.getElementById('A').value = A.map(row => row.join(',')).join('\n');
                         document.getElementById('b').value = b.join(',');
                         document.getElementById('eq_constraints').value = eqConstraints.join(',');
                         document.getElementById('ge_constraints').value = geConstraints.join(',');
+
+                        // Preparar objetivo (minimizar/maximizar)
+                        const isMinimize = document.querySelector('input[name="objective_type"]:checked').value === 'minimize';
+                        document.getElementById('minimize_hidden').value = isMinimize ? '1' : '0';
                     }
 
-                    function loadExample() {
-                        // Ejemplo típico para dos fases
-                        numVars = 3;
-                        numConstraints = 3;
-                        document.getElementById('numVariables').value = numVars;
+                    function loadExample(method, exampleIndex) {
+                        if (method === 'dosfases') {
+                            switch (exampleIndex) {
+                                case 0:
+                                    // Ejemplo 1 - Básico
+                                    variableCount = 3;
+                                    updateButtonGroup();
+                                    updateObjectiveFunction();
+                                    clearConstraints();
 
-                        updateVariables();
+                                    // Función objetivo: 3x₁ + 2x₂ + x₃
+                                    setTimeout(() => {
+                                        document.getElementById('objective_coef_0').value = 3;
+                                        document.getElementById('objective_coef_1').value = 2;
+                                        document.getElementById('objective_coef_2').value = 1;
 
-                        // Función objetivo: 3x₁ + 2x₂ + x₃
-                        document.getElementById('c_0').value = 3;
-                        document.getElementById('c_1').value = 2;
-                        document.getElementById('c_2').value = 1;
+                                        // Añadir restricciones
+                                        addConstraint();
+                                        addConstraint();
+                                        addConstraint();
 
-                        // Restricciones
-                        // x₁ + 2x₂ + x₃ = 12
-                        document.getElementById('a_0_0').value = 1;
-                        document.getElementById('a_0_1').value = 2;
-                        document.getElementById('a_0_2').value = 1;
-                        document.getElementById('sign_0').value = '=';
-                        document.getElementById('b_0').value = 12;
+                                        setTimeout(() => {
+                                            // x₁ + 2x₂ + x₃ = 12
+                                            document.getElementById('constraint_0_coef_0').value = 1;
+                                            document.getElementById('constraint_0_coef_1').value = 2;
+                                            document.getElementById('constraint_0_coef_2').value = 1;
+                                            document.getElementById('constraint_0_sign').value = '=';
+                                            document.getElementById('constraint_0_rhs').value = 12;
 
-                        // 2x₁ + x₂ + 3x₃ ≤ 8
-                        document.getElementById('a_1_0').value = 2;
-                        document.getElementById('a_1_1').value = 1;
-                        document.getElementById('a_1_2').value = 3;
-                        document.getElementById('sign_1').value = '<=';
-                        document.getElementById('b_1').value = 8;
+                                            // 2x₁ + x₂ + 3x₃ ≤ 8
+                                            document.getElementById('constraint_1_coef_0').value = 2;
+                                            document.getElementById('constraint_1_coef_1').value = 1;
+                                            document.getElementById('constraint_1_coef_2').value = 3;
+                                            document.getElementById('constraint_1_sign').value = '<=';
+                                            document.getElementById('constraint_1_rhs').value = 8;
 
-                        // x₁ + x₂ + x₃ ≥ 6
-                        document.getElementById('a_2_0').value = 1;
-                        document.getElementById('a_2_1').value = 1;
-                        document.getElementById('a_2_2').value = 1;
-                        document.getElementById('sign_2').value = '>=';
-                        document.getElementById('b_2').value = 6;
+                                            // x₁ + x₂ + x₃ ≥ 6
+                                            document.getElementById('constraint_2_coef_0').value = 1;
+                                            document.getElementById('constraint_2_coef_1').value = 1;
+                                            document.getElementById('constraint_2_coef_2').value = 1;
+                                            document.getElementById('constraint_2_sign').value = '>=';
+                                            document.getElementById('constraint_2_rhs').value = 6;
+                                        }, 100);
+                                    }, 100);
+                                    break;
+                            }
+                        }
+                        saveFormDataToLocalStorage();
                     }
 
                     function clearForm() {
-                        // Limpiar función objetivo
-                        for (let i = 0; i < numVars; i++) {
-                            document.getElementById(`c_${i}`).value = '';
-                        }
-
-                        // Limpiar restricciones
-                        for (let i = 0; i < numConstraints; i++) {
-                            for (let j = 0; j < numVars; j++) {
-                                document.getElementById(`a_${i}_${j}`).value = '';
-                            }
-                            document.getElementById(`b_${i}`).value = '';
-                            document.getElementById(`sign_${i}`).value = '<=';
-                        }
-
-                        // Limpiar checkboxes
-                        document.getElementById('minimize').checked = false;
-                        document.getElementById('track_iterations').checked = false;
+                        clearConstraints();
+                        updateObjectiveFunction();
+                        document.querySelector('input[name="objective_type"][value="maximize"]').checked = true;
+                        saveFormDataToLocalStorage();
                     }
+
+                    function clearConstraints() {
+                        const container = document.getElementById('constraints-container');
+                        container.innerHTML = '';
+                        constraintCount = 0;
+                    }
+
+                    function updateButtonGroup() {
+                        document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+                        document.querySelector(`.btn-group .btn:nth-child(${variableCount - 1})`).classList.add('active');
+                    }
+
+                    function saveFormDataToLocalStorage() {
+                        // Implementar si es necesario
+                    }
+
+                    // Preparar datos antes de enviar el formulario
+                    document.getElementById('dosfasesForm').addEventListener('submit', function (e) {
+                        prepareFormData();
+                    });
+
+                    // Inicialización
+                    document.addEventListener('DOMContentLoaded', function () {
+                        updateObjectiveFunction();
+                        addConstraint(); // Agregar una restricción por defecto
+                    });
+                    document.getElementById('track_iterations').checked = false;
+
 
                     // Preparar datos antes de enviar el formulario
                     document.getElementById('doseasesForm').addEventListener('submit', function (e) {
                         prepareFormData();
-                    });                    // Inicializar la interfaz
+                    }); // Inicializar la interfaz
                     document.addEventListener('DOMContentLoaded', function () {
                         // Verificar si hay datos del formulario para restaurar
                         restoreFormDataDosFases();
@@ -354,8 +497,10 @@
                             const bValues = formDataB.split(',').map(v => parseFloat(v.trim()));
 
                             // Parsear restricciones especiales
-                            const eqConstraints = formDataEqConstraints ? formDataEqConstraints.split(',').map(v => parseInt(v.trim())) : [];
-                            const geConstraints = formDataGeConstraints ? formDataGeConstraints.split(',').map(v => parseInt(v.trim())) : [];
+                            const eqConstraints = formDataEqConstraints ? formDataEqConstraints.split(',').map(v =>
+                                parseInt(v.trim())) : [];
+                            const geConstraints = formDataGeConstraints ? formDataGeConstraints.split(',').map(v =>
+                                parseInt(v.trim())) : [];
 
                             // Determinar número de variables
                             numVars = cValues.length;
@@ -414,48 +559,114 @@
                                 });
                             }, 100);
                         }
-                    }
-                </script>
-
-                <!-- Estilos CSS adicionales -->
+                    } </script> <!-- Estilos CSS adicionales -->
                 <style>
+                    /* Estilos para el formulario mejorado */
+                    .constraint-coef,
+                    .constraint-rhs {
+                        min-width: 70px;
+                    }
+
+                    .constraint-sign {
+                        min-width: 80px;
+                    }
+
+                    .card {
+                        transition: all 0.3s ease;
+                    }
+
+                    .card:hover {
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    }
+
+                    /* Estilos para la solución esperada */
+                    #expected-solution-container {
+                        animation: fadeIn 0.5s ease-in;
+                    }
+
+                    @keyframes fadeIn {
+                        from {
+                            opacity: 0;
+                            transform: translateY(-10px);
+                        }
+
+                        to {
+                            opacity: 1;
+                            transform: translateY(0);
+                        }
+                    }
+
+                    #expected-solution-container .alert {
+                        border-left: 4px solid #ffc107;
+                        background: linear-gradient(135deg, #fff3cd 0%, #f8f9fa 100%);
+                    }
+
+                    #expected-solution-container .badge {
+                        font-size: 0.85em;
+                        margin: 2px;
+                        padding: 6px 10px;
+                    }
+
+                    #expected-solution-container .alert-heading {
+                        color: #856404;
+                        font-size: 1rem;
+                    }
+
+                    .btn-group .btn {
+                        transition: all 0.2s ease;
+                    }
+
+                    .btn-group .btn.active {
+                        background-color: #ffc107;
+                        border-color: #ffc107;
+                        color: #212529;
+                        font-weight: 600;
+                    }
+
+                    .form-control-sm {
+                        font-size: 0.875rem;
+                    }
+
+                    .text-warning {
+                        font-weight: 600;
+                    }
+
+                    .gap-2 {
+                        gap: 0.5rem !important;
+                    }
+
+                    /* Animaciones suaves */
+                    .card-body {
+                        transition: all 0.3s ease;
+                    }
+
+                    /* Mejorar el spacing */
+                    .d-flex.align-items-center {
+                        min-height: 38px;
+                    }
+
+                    /* Estilos para los inputs numéricos */
+                    input[type="number"] {
+                        text-align: center;
+                    }
+
+                    /* Mejorar la apariencia de los radio buttons */
+                    .form-check-input:checked {
+                        background-color: #ffc107;
+                        border-color: #ffc107;
+                    }
+
+                    /* Estilos para las etiquetas de variables */
+                    .text-warning {
+                        color: #ffc107 !important;
+                    }
+
+                    /* Estilos específicos para dos fases */
                     .coefficient-group {
                         display: inline-flex;
                         align-items: center;
                         flex-direction: column;
                         text-align: center;
-                    }
-
-                    .coefficient-group input {
-                        margin-bottom: 2px;
-                    }
-
-                    .coefficient-group label {
-                        font-size: 0.8rem;
-                        margin: 0;
-                        color: #6c757d;
-                    }
-
-                    .constraint-row {
-                        background-color: #f8f9fa;
-                        transition: all 0.3s ease;
-                    }
-
-                    .constraint-row:hover {
-                        background-color: #e9ecef;
-                    }
-
-                    .objective-container {
-                        background-color: #fff3cd;
-                        padding: 15px;
-                        border-radius: 8px;
-                        border-left: 4px solid #ffc107;
-                    }
-
-                    .form-label-sm {
-                        font-size: 0.8rem;
-                        color: #6c757d;
-                        margin: 0;
                     }
 
                     .btn-download-json {
@@ -469,16 +680,119 @@
                         box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
                     }
 
+                    /* Mejorar el diseño responsive */
                     @media (max-width: 768px) {
+                        .d-flex.flex-wrap {
+                            flex-direction: column;
+                            align-items: stretch !important;
+                        }
+
+                        .d-flex.flex-wrap .d-flex {
+                            justify-content: space-between;
+                            margin-bottom: 0.5rem;
+                        }
+
+                        .constraint-coef,
+                        .constraint-rhs,
+                        .constraint-sign {
+                            min-width: auto;
+                            width: 100%;
+                        }
+
                         .coefficient-group {
                             margin-bottom: 10px;
                         }
+                    }
 
-                        .constraint-row .col-md-7,
-                        .constraint-row .col-md-2,
-                        .constraint-row .col-md-3 {
-                            margin-bottom: 10px;
-                        }
+                    /* Estilos para distinguir las fases del algoritmo */
+                    .iteration-phase-one .accordion-button {
+                        background-color: #fff8e1 !important;
+                        border-left: 4px solid #ffc107 !important;
+                    }
+
+                    .iteration-phase-one .accordion-button:not(.collapsed) {
+                        background-color: #ffeaa7 !important;
+                        color: #212529 !important;
+                        box-shadow: inset 0 -1px 0 rgba(255, 193, 7, 0.125) !important;
+                    }
+
+                    .iteration-phase-two .accordion-button {
+                        background-color: #e3f2fd !important;
+                        border-left: 4px solid #0d6efd !important;
+                    }
+
+                    .iteration-phase-two .accordion-button:not(.collapsed) {
+                        background-color: #bbdefb !important;
+                        color: #212529 !important;
+                        box-shadow: inset 0 -1px 0 rgba(13, 110, 253, 0.125) !important;
+                    }
+
+                    .phase-one-body {
+                        background-color: #fffbf0 !important;
+                        border-left: 4px solid #ffc107;
+                    }
+
+                    .phase-two-body {
+                        background-color: #f8fbff !important;
+                        border-left: 4px solid #0d6efd;
+                    }
+
+                    .phase-one-table {
+                        background-color: #fffef7 !important;
+                    }
+
+                    .phase-one-table thead th {
+                        background-color: #ffeaa7 !important;
+                        color: #212529 !important;
+                        border-color: #ffc107 !important;
+                    }
+
+                    .phase-one-table tbody tr:nth-child(even) {
+                        background-color: #fff8e1 !important;
+                    }
+
+                    .phase-two-table {
+                        background-color: #fbfcff !important;
+                    }
+
+                    .phase-two-table thead th {
+                        background-color: #bbdefb !important;
+                        color: #212529 !important;
+                        border-color: #0d6efd !important;
+                    }
+
+                    .phase-two-table tbody tr:nth-child(even) {
+                        background-color: #e3f2fd !important;
+                    }
+
+                    /* Estilo para el elemento pivote mantiene su color original */
+                    .pivot-cell {
+                        background-color: #dc3545 !important;
+                        color: white !important;
+                        font-weight: bold !important;
+                    }
+
+                    /* Efectos hover para las tablas de las fases */
+                    .phase-one-table tbody tr:hover {
+                        background-color: #ffecb3 !important;
+                    }
+
+                    .phase-two-table tbody tr:hover {
+                        background-color: #c5cae9 !important;
+                    }
+
+                    /* Badges específicos para las fases */
+                    .badge.bg-warning.text-dark {
+                        background-color: #ffc107 !important;
+                        color: #212529 !important;
+                        font-weight: 600;
+                        text-shadow: none;
+                    }
+
+                    .badge.bg-primary {
+                        background-color: #0d6efd !important;
+                        color: white !important;
+                        font-weight: 600;
                     }
                 </style>
             </div>
@@ -532,10 +846,10 @@
                                     {% endfor %}
                                 </p>
                             </div>
-                        </div>
-                        {% endfor %}
+                        </div> {% endfor %}
                     </div>
-                    {% endif %} {% else %}
+                    {% endif %}
+                    {% else %}
                     <p class="mb-2">
                         <strong>Solución:</strong>
                         {% for val in resultado.solution %}
@@ -571,63 +885,70 @@
                 </div>
             </div>
         </div>
-    </div>
+        {% endif %}
 
-    {% if resultado.tableau_history %}
-    <div class="card">
-        <div class="card-header">
-            <h6 class="mb-0">
-                <i class="fas fa-table me-2"></i>Iteraciones del Algoritmo
-            </h6>
-        </div>
-        <div class="card-body">
-            <div class="alert alert-info">
-                <small><strong>Fases del algoritmo:</strong> Las primeras iteraciones corresponden a la Fase I
-                    (búsqueda de factibilidad), las siguientes a la Fase II (optimización).</small>
+        <!-- Sección de Iteraciones del Algoritmo movida al lado -->
+        {% if resultado.tableau_history %}
+        <div class="card mt-3">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0">
+                    <i class="fas fa-table me-2"></i>Iteraciones del Algoritmo
+                </h6>
             </div>
-            <div class="accordion" id="iterationsAccordion">
-                {% for i in range(resultado.tableau_history|length) %}
-                <div class="accordion-item">
-                    <h2 class="accordion-header" id="heading{{ i }}">
-                        <button class="accordion-button {% if i != 0 %}collapsed{% endif %}" type="button"
-                            data-bs-toggle="collapse" data-bs-target="#collapse{{ i }}">
-                            Iteración {{ i + 1 }}
-                            {% if i < resultado.pivot_history|length %} <small class="ms-2 text-muted">
-                                (Pivote: fila {{ resultado.pivot_history[i][0] }}, columna {{
-                                resultado.pivot_history[i][1] }})
-                                </small>
-                                {% endif %}
-                        </button>
-                    </h2>
-                    <div id="collapse{{ i }}" class="accordion-collapse collapse {% if i == 0 %}show{% endif %}"
-                        data-bs-parent="#iterationsAccordion">
-                        <div class="accordion-body">
-                            <div class="table-responsive">
-                                <table class="table table-sm tableau-table">
-                                    {% for row_idx in range(resultado.tableau_history[i]|length) %}
-                                    <tr>
-                                        {% for col_idx in range(resultado.tableau_history[i][row_idx]|length) %}
-                                        <td
-                                            class="{% if i < resultado.pivot_history|length and row_idx == resultado.pivot_history[i][0] and col_idx == resultado.pivot_history[i][1] %}pivot-cell{% endif %}">
-                                            {{ "%.3f"|format(resultado.tableau_history[i][row_idx][col_idx]) }}
-                                        </td>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <small><strong>Fases del algoritmo:</strong>
+                        <span class="badge bg-warning text-dark me-1">Fase I</span> (búsqueda de factibilidad)
+                        <span class="badge bg-primary me-1">Fase II</span> (optimización)
+                    </small>
+                </div>
+                <div class="accordion" id="iterationsAccordion">
+                    {% for i in range(resultado.tableau_history|length) %}
+                    {% set is_phase_1 = i < (resultado.phase_switch_iteration if resultado.phase_switch_iteration else
+                        resultado.tableau_history|length // 2) %} <div
+                        class="accordion-item iteration-phase-{{ 'one' if is_phase_1 else 'two' }}">
+                        <h2 class="accordion-header" id="heading{{ i }}">
+                            <button
+                                class="accordion-button {% if i != 0 %}collapsed{% endif %} phase-{{ 'one' if is_phase_1 else 'two' }}-header"
+                                type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ i }}">
+                                <span class="badge me-2 {{ 'bg-warning text-dark' if is_phase_1 else 'bg-primary' }}">
+                                    {{ 'Fase I' if is_phase_1 else 'Fase II' }}
+                                </span>
+                                Iteración {{ i + 1 }}
+                                {% if i < resultado.pivot_history|length %} <small class="ms-2 text-muted">
+                                    (Pivote: fila {{ resultado.pivot_history[i][0] }}, columna {{
+                                    resultado.pivot_history[i][1] }})
+                                    </small>
+                                    {% endif %}
+                            </button>
+                        </h2>
+                        <div id="collapse{{ i }}" class="accordion-collapse collapse {% if i == 0 %}show{% endif %}"
+                            data-bs-parent="#iterationsAccordion">
+                            <div class="accordion-body phase-{{ 'one' if is_phase_1 else 'two' }}-body">
+                                <div class="table-responsive">
+                                    <table class="table table-sm phase-{{ 'one' if is_phase_1 else 'two' }}-table">
+                                        {% for row_idx in range(resultado.tableau_history[i]|length) %}
+                                        <tr>
+                                            {% for col_idx in range(resultado.tableau_history[i][row_idx]|length) %}
+                                            <td
+                                                class="{% if i < resultado.pivot_history|length and row_idx == resultado.pivot_history[i][0] and col_idx == resultado.pivot_history[i][1] %}pivot-cell{% endif %}">
+                                                {{ "%.3f"|format(resultado.tableau_history[i][row_idx][col_idx]) }}
+                                            </td>
+                                            {% endfor %}
+                                        </tr>
                                         {% endfor %}
-                                    </tr>
-                                    {% endfor %}
-                                </table>
+                                    </table>
+                                </div>
                             </div>
                         </div>
-                    </div>
                 </div>
                 {% endfor %}
             </div>
         </div>
-    </div> {% endif %}
-    {% endif %}
+    </div>
+    {% endif %} {# resultado.tableau_history #}
+    {% endif %} {# resultado #}
 
-    {% if video_url %} {% endif %}
-</div>
-{% endif %}
 </div>
 </div>
 

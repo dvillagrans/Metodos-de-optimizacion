@@ -96,8 +96,8 @@ def dosfases_solver(c, A, b, eq_constraints=None, ge_constraints=None, minimize=
     if not artificial_needed:
         # No artificial variables needed - can solve directly
         solution, optimal_value, phase_tableau_history, phase_pivot_history = solve_standard_form(
-            c, A_with_slack, b_std, minimize, track_iterations
-        )
+            c, A_with_slack, b_std, minimize, track_iterations=True
+        )        
         if track_iterations and solution is not None:
             tableau_history.extend(phase_tableau_history)
             pivot_history.extend(phase_pivot_history)
@@ -105,7 +105,8 @@ def dosfases_solver(c, A, b, eq_constraints=None, ge_constraints=None, minimize=
         if track_iterations:
             return solution, optimal_value, tableau_history, pivot_history
         return solution, optimal_value
-      # Phase 1: Add artificial variables
+    
+    # Phase 1: Add artificial variables
     num_artificial = len(artificial_needed)
     artificial_matrix = np.zeros((m, num_artificial))
     

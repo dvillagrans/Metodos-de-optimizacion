@@ -28,24 +28,41 @@
                         </label>
                         <div class="d-flex flex-wrap gap-2 mb-2">
                             <button type="button" class="btn btn-outline-secondary btn-sm"
-                                onclick="loadExample('simplex', 0)">
+                                onclick="loadSimplexExample('simplex', 0)">
                                 <i class="fas fa-lightbulb me-1"></i>Ejemplo 1 - Producción
                             </button>
                             <button type="button" class="btn btn-outline-secondary btn-sm"
-                                onclick="loadExample('simplex', 1)">
+                                onclick="loadSimplexExample('simplex', 1)">
                                 <i class="fas fa-lightbulb me-1"></i>Ejemplo 2 - Transporte
                             </button>
                             <button type="button" class="btn btn-outline-secondary btn-sm"
-                                onclick="loadExample('simplex', 2)">
+                                onclick="loadSimplexExample('simplex', 2)">
                                 <i class="fas fa-lightbulb me-1"></i>Ejemplo 3 - Inversión
                             </button>
                             <button type="button" class="btn btn-outline-warning btn-sm"
-                                onclick="loadExample('simplex', 3)">
+                                onclick="loadSimplexExample('simplex', 3)">
                                 <i class="fas fa-exclamation-triangle me-1"></i>Ejemplo 4 - No Acotado
                             </button>
-                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearForm()">
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="loadSimplexExample('simplex', 4)">
+                                <i class="fas fa-lightbulb me-1"></i>Ejercicio 3
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="loadSimplexExample('simplex', 5)">
+                                <i class="fas fa-lightbulb me-1"></i>Ejercicio 6 (Mod)
+                            </button> <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearForm()">
                                 <i class="fas fa-eraser me-1"></i>Limpiar
                             </button>
+                        </div>
+
+                        <!-- Solución Esperada -->
+                        <div id="expected-solution-container" class="mt-2" style="display: none;">
+                            <div class="alert alert-info mb-0">
+                                <h6 class="alert-heading mb-2">
+                                    <i class="fas fa-info-circle me-1"></i>Solución Esperada:
+                                </h6>
+                                <div id="expected-solution-content"></div>
+                            </div>
                         </div>
                     </div>
 
@@ -579,34 +596,88 @@
         });
 
         localStorage.setItem('simplex_dynamic_form_data', JSON.stringify(formData));
-    }    // Función para limpiar formulario
-    function clearForm() {
-        // Resetear a valores por defecto
-        variableCount = 3;
-        document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector('.btn-group .btn:nth-child(2)').classList.add('active');
+    }    // Función para limpiar formulario    function clearForm() {
+    // Resetear a valores por defecto
+    variableCount = 3;
+    document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector('.btn-group .btn:nth-child(2)').classList.add('active');
 
-        document.getElementById('maximize').checked = true;
-        document.getElementById('track_iterations').checked = true;
+    document.getElementById('maximize').checked = true;
+    document.getElementById('track_iterations').checked = true;
 
-        // Limpiar campos hidden
-        document.getElementById('c').value = '';
-        document.getElementById('A').value = '';
-        document.getElementById('b').value = '';
-        document.getElementById('minimize_hidden').value = '';
+    // Limpiar campos hidden
+    document.getElementById('c').value = '';
+    document.getElementById('A').value = '';
+    document.getElementById('b').value = '';
+    document.getElementById('minimize_hidden').value = '';
 
-        // Limpiar datos guardados en localStorage
-        localStorage.removeItem('simplex_dynamic_form_data');
+    // Ocultar solución esperada
+    const expectedSolutionContainer = document.getElementById('expected-solution-container');
+    if (expectedSolutionContainer) {
+        expectedSolutionContainer.style.display = 'none';
+    }
 
-        initializeForm();
-    }    // Función para cargar ejemplos
-    function loadExample(method, exampleIndex) {
+    // Limpiar datos guardados en localStorage
+    localStorage.removeItem('simplex_dynamic_form_data');
+
+    initializeForm();
+
+
+    // Función para mostrar la solución esperada
+    function showExpectedSolution(example) {
+        const container = document.getElementById('expected-solution-container');
+        const content = document.getElementById('expected-solution-content');
+
+        if (example.expected_solution) {
+            const solution = example.expected_solution;
+            let solutionHtml = '<div class="row">';
+
+            // Mostrar valor óptimo
+            solutionHtml += `
+                <div class="col-md-6">
+                    <strong>Valor Óptimo (Z*):</strong> 
+                    <span class="badge bg-success">${solution.Z}</span>
+                </div>
+            `;
+
+            // Mostrar variables
+            if (solution.variables && solution.variables.length > 0) {
+                solutionHtml += `
+                    <div class="col-md-6">
+                        <strong>Variables:</strong><br>
+                `;
+
+                solution.variables.forEach((value, index) => {
+                    const variableName = `x${index + 1}`;
+                    solutionHtml += `
+                        <span class="badge bg-primary me-1">
+                            ${variableName} = ${value}
+                        </span>
+                    `;
+                });
+
+                solutionHtml += '</div>';
+            }
+
+            solutionHtml += '</div>';
+
+            content.innerHTML = solutionHtml;
+            container.style.display = 'block';
+        } else {
+            container.style.display = 'none';
+        }
+    }
+
+    // Función para cargar ejemplos
+    function loadSimplexExample(method, exampleIndex) {
         if (typeof examples === 'undefined' || !examples[method] || !examples[method][exampleIndex]) {
-            console.error('Ejemplo no encontrado');
+            console.error('Ejemplo no encontrado:', method, exampleIndex);
+            alert(`Error: No se pudo cargar el ejemplo ${exampleIndex + 1}. Verifica que exists.js esté cargado correctamente.`);
             return;
         }
 
         const example = examples[method][exampleIndex];
+        console.log('Cargando ejemplo:', example.name, example);
 
         // Determinar número de variables
         const cValues = example.c.split(',');
@@ -620,14 +691,24 @@
         }
 
         // Configurar objetivo
-        document.getElementById(example.minimize ? 'minimize' : 'maximize').checked = true;
+        const targetRadio = example.minimize ? 'minimize' : 'maximize';
+        const radio = document.getElementById(targetRadio);
+        if (radio) {
+            radio.checked = true;
+        } else {
+            console.error('No se encontró el radio button:', targetRadio);
+        }
 
         updateObjectiveFunction();
 
         // Cargar coeficientes objetivo
         cValues.forEach((val, i) => {
             const input = document.getElementById(`obj_coef_${i}`);
-            if (input) input.value = parseFloat(val.trim());
+            if (input) {
+                input.value = parseFloat(val.trim());
+            } else {
+                console.warn(`No se encontró input obj_coef_${i}`);
+            }
         });
 
         // Cargar restricciones
@@ -645,21 +726,56 @@
                 const coeffs = row.split(',');
                 coeffs.forEach((coeff, colIndex) => {
                     const input = document.getElementById(`constraint_${rowIndex}_coef_${colIndex}`);
-                    if (input) input.value = parseFloat(coeff.trim());
+                    if (input) {
+                        input.value = parseFloat(coeff.trim());
+                    } else {
+                        console.warn(`No se encontró input constraint_${rowIndex}_coef_${colIndex}`);
+                    }
                 });
 
                 const rhsInput = document.getElementById(`constraint_${rowIndex}_rhs`);
                 if (rhsInput && bValues[rowIndex]) {
                     rhsInput.value = parseFloat(bValues[rowIndex].trim());
+                } else if (!rhsInput) {
+                    console.warn(`No se encontró input constraint_${rowIndex}_rhs`);
                 }
             }
-        });
+        });        // Mostrar solución esperada si existe
+        showExpectedSolution(example);
+
+        // Mostrar notificación de éxito
+        showNotification(`Ejemplo cargado: ${example.name}`, 'success');
 
         // Guardar los datos cargados en localStorage
         setTimeout(() => {
             saveFormDataToLocalStorage();
         }, 100);
-    }    // Función para inicializar el formulario
+    }
+
+    // Función simple para mostrar notificaciones
+    function showNotification(message, type = 'info') {
+        // Crear elemento de notificación si no existe showNotification en examples.js
+        if (typeof window.showNotification !== 'function') {
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+            notification.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px;';
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 3000);
+        }
+    }
+
+    // Exponer la función globalmente para que examples.js pueda usarla
+    window.loadSimplexExample = loadSimplexExample;    // Función para inicializar el formulario
     function initializeForm() {
         // Limpiar contenedor de restricciones
         document.getElementById('constraints-container').innerHTML = '';
@@ -674,7 +790,7 @@
         }
 
         // Cargar ejemplo por defecto
-        loadExample('simplex', 0);
+        loadSimplexExample('simplex', 0);
     }// Función para restaurar datos del formulario desde localStorage o campos hidden
     function restoreFormData() {
         // Primero intentar restaurar desde localStorage (datos dinámicos)
@@ -891,6 +1007,39 @@
 
     .card:hover {
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Estilos para la solución esperada */
+    #expected-solution-container {
+        animation: fadeIn 0.5s ease-in;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    #expected-solution-container .alert {
+        border-left: 4px solid #0d6efd;
+        background: linear-gradient(135deg, #e7f3ff 0%, #f8f9fa 100%);
+    }
+
+    #expected-solution-container .badge {
+        font-size: 0.85em;
+        margin: 2px;
+        padding: 6px 10px;
+    }
+
+    #expected-solution-container .alert-heading {
+        color: #0d6efd;
+        font-size: 1rem;
     }
 
     .btn-group .btn {

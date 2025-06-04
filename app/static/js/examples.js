@@ -1,100 +1,240 @@
-// Datos de ejemplo para los diferentes métodos de optimización
 const examples = {
     simplex: [
         {
-            name: "Ejemplo 1 - Producción",
-            c: "5,7",
-            A: "2,3\n1,1\n1,0",
-            b: "12,5,3",
+            name: "Ejercicio 3 - Simplex",
+            c: "3,5",
+            A: "2,3\n4,1",
+            b: "8,7",
             minimize: false,
-            description: "Maximizar: 5x₁ + 7x₂"
+            description: "Maximizar: 3x₁ + 5x₂ con restricciones ≤",
+            expected_solution: {
+                Z: 13.33,
+                variables: [1, "8/3"]
+            }
         },
         {
-            name: "Ejemplo 2 - Transporte",
-            c: "3,4,6",
-            A: "1,1,1\n2,1,0\n0,1,2",
-            b: "10,8,7",
+            name: "Ejercicio 6 (modificado) - Simplex",
+            c: "2,2,4",
+            A: "2,1,1\n-3,-4,-2",
+            b: "2,-8",
             minimize: false,
-            description: "Maximizar: 3x₁ + 4x₂ + 6x₃"
-        }, {
-            name: "Ejemplo 3 - Inversión",
-            c: "0.2,0.3,0.1",
-            A: "1,1,1\n0.5,0.2,0.3\n0.1,0.4,0.2",
-            b: "1000,400,300",
-            minimize: false,
-            description: "Maximizar: 0.2x₁ + 0.3x₂ + 0.1x₃"
+            description: "Versión modificada con restricciones ≤",
+            expected_solution: {
+                Z: 4,
+                variables: [0, 2, 0]
+            }
         },
         {
-            name: "Ejemplo 4 - No Acotado",
-            c: "1,1",
-            A: "-1,1\n-1,-1",
-            b: "1,-2",
+            name: "Ejercicio 9 - Simplex",
+            c: "3,9",
+            A: "1,4\n1,2",
+            b: "8,4",
             minimize: false,
-            description: "Problema no acotado para probar detección de errores"
+            description: "Maximizar con solución degenerada",
+            expected_solution: {
+                Z: 18,
+                variables: [0, 2]
+            }
+        },
+        {
+            name: "Ejercicio 10 - Simplex",
+            c: "3,2",
+            A: "4,-1\n4,3\n4,1",
+            b: "8,12,8",
+            minimize: false,
+            description: "Maximizar con 3 restricciones ≤",
+            expected_solution: {
+                Z: 8.5,
+                variables: [1.5, 2]
+            }
+        },
+        {
+            name: "Ejercicio 11 - Simplex",
+            c: "2,4",
+            A: "1,2\n1,1",
+            b: "5,4",
+            minimize: false,
+            description: "Maximizar: 2x₁ + 4x₂",
+            expected_solution: {
+                Z: 10,
+                variables: [0, 2.5]
+            }
         }
     ],
     granm: [
         {
-            name: "Ejemplo 1 - Gran M",
-            c: "2,3",
-            A: "1,1\n2,1\n1,2",
-            b: "4,6,5",
-            eq_constraints: "0",
-            minimize: false,
-            description: "Maximizar: 2x₁ + 3x₂ con restricción de igualdad"
-        },
-        {
-            name: "Ejemplo 2 - Sistema Mixto",
-            c: "3,2,1",
-            A: "1,1,1\n2,1,0\n1,0,1",
-            b: "6,8,4",
-            eq_constraints: "1,2",
-            minimize: false,
-            description: "Maximizar: 3x₁ + 2x₂ + x₃ con múltiples igualdades"
-        },
-        {
-            name: "Ejemplo 3 - Minimización",
-            c: "4,5",
-            A: "2,1\n1,3\n1,1",
-            b: "10,12,6",
-            eq_constraints: "2",
+            name: "Ejercicio 1 - Gran M",
+            c: "1,2,3",
+            A: "1,1,0\n1,1,1\n1,0,1\n1,0,1",
+            b: "2,3,4,5",
+            ge_constraints: "0,2",
             minimize: true,
-            description: "Minimizar: 4x₁ + 5x₂ con restricción de igualdad"
+            description: "Minimizar con mezcla de ≥ y ≤",
+            expected_solution: {
+                Z: 6,
+                variables: [3, 0, 1]
+            }
+        },
+        {
+            name: "Ejercicio 2 - Gran M",
+            c: "4,1",
+            A: "3,1\n4,3\n1,2",
+            b: "3,6,4",
+            eq_constraints: "0",
+            ge_constraints: "1",
+            minimize: true,
+            description: "Minimizar con =, ≥, ≤",
+            expected_solution: {
+                Z: "3.4 - 3.6",
+                variables: ["0.4 - 0.6", "1.8 - 1.2"]
+            }
+        },
+        {
+            name: "Ejercicio 4 - Gran M",
+            c: "3,2,3,0",
+            A: "1,4,1,0\n2,1,0,1",
+            b: "7,10",
+            ge_constraints: "0,1",
+            minimize: true,
+            description: "Minimizar con solo ≥",
+            expected_solution: {
+                Z: 35.5,
+                variables: [0, 11.75, 6, 8.25]
+            }
+        },
+        {
+            name: "Ejercicio 5 - Gran M",
+            c: "1,5,3",
+            A: "1,2,1\n2,-1,0",
+            b: "3,4",
+            eq_constraints: "0,1",
+            minimize: false,
+            description: "Maximizar con igualdades",
+            expected_solution: {
+                Z: 5,
+                variables: [2, 0, 1]
+            }
+        },
+        {
+            name: "Ejercicio 7 - Gran M",
+            c: "2,5",
+            A: "3,2\n2,1",
+            b: "6,2",
+            ge_constraints: "0",
+            minimize: false,
+            description: "No factible",
+            expected_solution: null
+        },
+        {
+            name: "Ejercicio 12 - Gran M",
+            c: "2,1",
+            A: "1,-1\n2,0",
+            b: "10,40",
+            ge_constraints: "1",
+            minimize: false,
+            description: "No acotado",
+            expected_solution: null
+        },
+        {
+            name: "Ejercicio 13 - Gran M",
+            c: "3,2",
+            A: "2,1\n3,4",
+            b: "2,12",
+            ge_constraints: "1",
+            minimize: false,
+            description: "No factible",
+            expected_solution: null
+        },
+        {
+            name: "Ejercicio 14 - Gran M",
+            c: "5,12,4",
+            A: "1,2,1\n2,-1,3",
+            b: "10,8",
+            eq_constraints: "1",
+            minimize: false,
+            description: "Maximizar con igualdad",
+            expected_solution: {
+                Z: 54.8,
+                variables: [5.20, 2.40, 0]
+            }
+        },
+        {
+            name: "Ejercicio 15 - Gran M",
+            c: "5,6,3",
+            A: "5,5,3\n1,1,-1\n7,6,-3\n5,5,5\n2,4,-15\n12,10,0\n0,1,-10",
+            b: "50,20,30,36,10,90,20",
+            ge_constraints: "0,1,2,3,4,5,6",
+            minimize: true,
+            description: "Minimizar con muchas ≥",
+            expected_solution: {
+                Z: 120,
+                variables: [0, 0, 0]
+            }
         }
     ],
     dosfases: [
-        {
-            name: "Ejemplo 1 - Dos Fases",
-            c: "3,2",
-            A: "1,1\n1,-1\n2,1",
-            b: "4,1,6",
-            eq_constraints: "0,1",
-            minimize: false,
-            description: "Maximizar: 3x₁ + 2x₂ con restricciones de igualdad"
-        },
-        {
-            name: "Ejemplo 2 - Sistema Complejo",
-            c: "2,3,1",
-            A: "1,1,1\n2,1,-1\n1,2,1",
-            b: "6,4,8",
-            eq_constraints: "1,2",
-            minimize: false,
-            description: "Maximizar: 2x₁ + 3x₂ + x₃ con sistema complejo"
-        },
-        {
-            name: "Ejemplo 3 - Producción Mixta",
-            c: "5,4,3",
-            A: "1,0,1\n0,1,1\n1,1,0",
-            b: "5,4,6",
-            eq_constraints: "0",
-            minimize: true,
-            description: "Minimizar: 5x₁ + 4x₂ + 3x₃ con producción mixta"
-        }
+        // Puedes clonar los ejercicios de granm si se usa Dos Fases como alternativa
     ]
 };
 
+// Función genérica para mostrar la solución esperada
+function showExpectedSolutionGeneric(example) {
+    const container = document.getElementById('expected-solution-container');
+    const content = document.getElementById('expected-solution-content');
+
+    // Solo proceder si existen los contenedores en el DOM
+    if (!container || !content) {
+        return;
+    }
+
+    if (example.expected_solution) {
+        const solution = example.expected_solution;
+        let solutionHtml = '<div class="row">';
+
+        // Mostrar valor óptimo
+        solutionHtml += `
+            <div class="col-md-6">
+                <strong>Valor Óptimo (Z*):</strong> 
+                <span class="badge bg-success">${solution.Z}</span>
+            </div>
+        `;
+
+        // Mostrar variables
+        if (solution.variables && solution.variables.length > 0) {
+            solutionHtml += `
+                <div class="col-md-6">
+                    <strong>Variables:</strong><br>
+            `;
+
+            solution.variables.forEach((value, index) => {
+                const variableName = `x${index + 1}`;
+                solutionHtml += `
+                    <span class="badge bg-primary me-1">
+                        ${variableName} = ${value}
+                    </span>
+                `;
+            });
+
+            solutionHtml += '</div>';
+        }
+
+        solutionHtml += '</div>';
+
+        content.innerHTML = solutionHtml;
+        container.style.display = 'block';
+    } else {
+        container.style.display = 'none';
+    }
+}
+
 // Función para cargar ejemplo en el formulario
 function loadExample(method, exampleIndex) {
+    // Para simplex, usar la función específica del formulario dinámico si existe
+    if (method === 'simplex' && typeof window.loadSimplexExample === 'function') {
+        window.loadSimplexExample(method, exampleIndex);
+        return;
+    }
+
     const example = examples[method][exampleIndex];
 
     if (!example) {
@@ -103,9 +243,9 @@ function loadExample(method, exampleIndex) {
     }
 
     // Llenar campos comunes
-    document.getElementById('c').value = example.c;
-    document.getElementById('A').value = example.A;
-    document.getElementById('b').value = example.b;
+    document.getElementById('c').value = example.c || '';
+    document.getElementById('A').value = example.A || '';
+    document.getElementById('b').value = example.b || '';
 
     // Manejar checkbox de minimizar
     const minimizeCheckbox = document.getElementById('minimize');
@@ -115,15 +255,28 @@ function loadExample(method, exampleIndex) {
 
     // Manejar campo de restricciones de igualdad (para Gran M y Dos Fases)
     const eqConstraintsField = document.getElementById('eq_constraints');
-    if (eqConstraintsField && example.eq_constraints !== undefined) {
-        eqConstraintsField.value = example.eq_constraints;
+    if (eqConstraintsField) {
+        eqConstraintsField.value = example.eq_constraints || '';
+    }
+
+    // Manejar campo de restricciones >= (para Gran M y Dos Fases)
+    const geConstraintsField = document.getElementById('ge_constraints');
+    if (geConstraintsField) {
+        geConstraintsField.value = example.ge_constraints || '';
     }
 
     // Manejar campo M específico para Gran M
     const mField = document.getElementById('M');
     if (mField && method === 'granm') {
         mField.value = example.M || 1000;
+    }    // Limpiar campos de seguimiento de iteraciones si existe
+    const trackIterationsCheckbox = document.getElementById('track_iterations');
+    if (trackIterationsCheckbox) {
+        trackIterationsCheckbox.checked = example.track_iterations || false;
     }
+
+    // Mostrar solución esperada si existe y hay un contenedor para ello
+    showExpectedSolutionGeneric(example);
 
     // Mostrar notificación
     showNotification(`Ejemplo cargado: ${example.name}`, 'success');
@@ -175,28 +328,28 @@ function createExampleButtons(method) {
 
 // Función para limpiar formulario
 function clearForm() {
-    document.getElementById('c').value = '';
-    document.getElementById('A').value = '';
-    document.getElementById('b').value = '';
-
-    const minimizeCheckbox = document.getElementById('minimize');
-    if (minimizeCheckbox) {
-        minimizeCheckbox.checked = false;
+    const form = document.querySelector('form[method="POST"]');
+    if (!form) {
+        console.error('No se encontró el formulario');
+        return;
     }
 
-    const eqConstraintsField = document.getElementById('eq_constraints');
-    if (eqConstraintsField) {
-        eqConstraintsField.value = '';
-    }
+    // Limpiar campos de texto y textarea
+    const textInputs = form.querySelectorAll('input[type="text"], input[type="number"], textarea');
+    textInputs.forEach(input => {
+        input.value = '';
+    });
 
+    // Limpiar checkboxes
+    const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+
+    // Restablecer valores por defecto específicos
     const mField = document.getElementById('M');
     if (mField) {
         mField.value = '1000';
-    }
-
-    const trackIterationsCheckbox = document.getElementById('track_iterations');
-    if (trackIterationsCheckbox) {
-        trackIterationsCheckbox.checked = false;
     }
 
     showNotification('Formulario limpiado', 'info');
@@ -375,7 +528,9 @@ document.addEventListener('DOMContentLoaded', function () {
         currentMethod = 'granm';
     } else if (window.location.pathname.includes('dosfases')) {
         currentMethod = 'dosfases';
-    }    // Agregar botones de ejemplo si estamos en una página de método Y no existen ya
+    }
+
+    // Agregar botones de ejemplo si estamos en una página de método Y no existen ya
     if (currentMethod && examples[currentMethod]) {
         const form = document.querySelector('form');
         // Verificar si ya existen botones de ejemplo en el HTML

@@ -38,10 +38,20 @@
                             <button type="button" class="btn btn-outline-secondary btn-sm"
                                 onclick="loadExample('granm', 2)" title="Minimización">
                                 <i class="fas fa-lightbulb me-1"></i>Ejemplo 3 - Minimización
-                            </button>
-                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearFormAdvanced()">
+                            </button> <button type="button" class="btn btn-outline-danger btn-sm"
+                                onclick="clearFormAdvanced()">
                                 <i class="fas fa-eraser me-1"></i>Limpiar
                             </button>
+                        </div>
+
+                        <!-- Solución Esperada -->
+                        <div id="expected-solution-container" class="mt-2" style="display: none;">
+                            <div class="alert alert-info mb-0">
+                                <h6 class="alert-heading mb-2">
+                                    <i class="fas fa-info-circle me-1"></i>Solución Esperada:
+                                </h6>
+                                <div id="expected-solution-content"></div>
+                            </div>
                         </div>
                     </div>
 
@@ -666,9 +676,7 @@
         // Tipo de optimización
         const isMinimize = document.getElementById('minimize').checked;
         document.getElementById('minimize_hidden').value = isMinimize ? 'on' : '';
-    }
-
-    // Limpiar formulario mejorado
+    }    // Limpiar formulario mejorado
     function clearFormAdvanced() {
         // Resetear a valores por defecto
         variableCount = 2;
@@ -678,6 +686,12 @@
         document.getElementById('maximize').checked = true;
         document.getElementById('track_iterations').checked = true;
         document.getElementById('M').value = '1000';
+
+        // Ocultar solución esperada
+        const expectedSolutionContainer = document.getElementById('expected-solution-container');
+        if (expectedSolutionContainer) {
+            expectedSolutionContainer.style.display = 'none';
+        }
 
         initializeFormGranM();
     }
@@ -764,6 +778,39 @@
 
     .card:hover {
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Estilos para la solución esperada */
+    #expected-solution-container {
+        animation: fadeIn 0.5s ease-in;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    #expected-solution-container .alert {
+        border-left: 4px solid #198754;
+        background: linear-gradient(135deg, #e8f5e8 0%, #f8f9fa 100%);
+    }
+
+    #expected-solution-container .badge {
+        font-size: 0.85em;
+        margin: 2px;
+        padding: 6px 10px;
+    }
+
+    #expected-solution-container .alert-heading {
+        color: #198754;
+        font-size: 1rem;
     }
 
     .btn-group .btn {
