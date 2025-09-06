@@ -78,12 +78,16 @@
                                     <div class="form-check form-check-inline">
                                         <input class="form-check-input" type="radio" name="objective_type" id="maximize"
                                             value="maximize" checked>
-                                        <label class="form-check-label" for="maximize">Maximizar</label>
+                                        <label class="form-check-label toggle-with-icons" for="maximize">
+                                            <i class="fas fa-arrow-up text-success me-1"></i>Maximizar
+                                        </label>
                                     </div>
                                     <div class="form-check form-check-inline">
                                         <input class="form-check-input" type="radio" name="objective_type" id="minimize"
                                             value="minimize">
-                                        <label class="form-check-label" for="minimize">Minimizar</label>
+                                        <label class="form-check-label toggle-with-icons" for="minimize">
+                                            <i class="fas fa-arrow-down text-primary me-1"></i>Minimizar
+                                        </label>
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center mb-2">
@@ -158,7 +162,7 @@
 
     <div class="col-lg-6">
         {% if resultado %}
-        <div class="result-section">
+        <div class="result-section results-panel p-4">
             {% if resultado.success %}
             <h4 class="text-success mb-3">
                 <i class="fas fa-check-circle me-2"></i>Solución Encontrada
@@ -166,9 +170,15 @@
             <div class="card mb-3">
                 <div class="card-body">
                     <h5 class="card-title">Resultado:</h5>
-                    <p class="mb-2">
-                        <strong>Valor óptimo:</strong> {{ "%.4f"|format(resultado.optimal_value) }}
-                    </p>
+                    <div class="mb-3">
+                        <div class="optimal-value-badge">
+                            <i class="fas fa-trophy"></i>
+                            <span>Valor óptimo: {{ "%.4f"|format(resultado.optimal_value) }}</span>
+                            <div class="validation-check">
+                                <i class="fas fa-check"></i>
+                            </div>
+                        </div>
+                    </div>
 
                     {% if resultado.has_multiple_solutions %}
                     <div class="alert alert-info">
@@ -221,27 +231,42 @@
                 </div>
             </div>
 
-            <!-- Botón para descargar JSON -->
-            <div class="json-download-section">
-                <form method="POST" action="{{ url_for('main.descargar_simplex_json') }}" class="d-inline">
-                    <!-- Hidden fields to preserve form data -->
-                    <input type="hidden" name="c" value="{{ form_data.c if form_data else '' }}">
-                    <input type="hidden" name="A" value="{{ form_data.A if form_data else '' }}">
-                    <input type="hidden" name="b" value="{{ form_data.b if form_data else '' }}">
-                    <input type="hidden" name="minimize" value="{{ 'on' if form_data and form_data.minimize else '' }}">
-                    <input type="hidden" name="track_iterations"
-                        value="{{ 'on' if form_data and form_data.track_iterations else '' }}">
+            <!-- Opciones de descarga mejoradas -->
+            <div class="card mt-3">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0">
+                        <i class="fas fa-download me-2"></i>Opciones de Descarga
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="download-options">
+                        <form method="POST" action="{{ url_for('main.descargar_simplex_json') }}" class="d-inline">
+                            <!-- Hidden fields to preserve form data -->
+                            <input type="hidden" name="c" value="{{ form_data.c if form_data else '' }}">
+                            <input type="hidden" name="A" value="{{ form_data.A if form_data else '' }}">
+                            <input type="hidden" name="b" value="{{ form_data.b if form_data else '' }}">
+                            <input type="hidden" name="minimize" value="{{ 'on' if form_data and form_data.minimize else '' }}">
+                            <input type="hidden" name="track_iterations"
+                                value="{{ 'on' if form_data and form_data.track_iterations else '' }}">
+                            <input type="hidden" name="resultado_json" value="{{ resultado | tojson | e }}">
 
-                    <!-- Hidden field for results -->
-                    <input type="hidden" name="resultado_json" value="{{ resultado | tojson | e }}">
-
-                    <button type="submit" class="btn btn-success btn-sm btn-download-json">
-                        <i class="fas fa-download me-2"></i>Descargar Resultado como JSON
-                    </button>
-                </form>
-                <div class="form-text mt-1">
-                    <i class="fas fa-info-circle me-1"></i>
-                    Incluye datos de entrada y resultados completos
+                            <button type="submit" class="btn btn-success btn-sm download-btn">
+                                <i class="fas fa-file-code me-2"></i>JSON Completo
+                            </button>
+                        </form>
+                        
+                        <button type="button" class="btn btn-info btn-sm download-btn" onclick="downloadAsCSV()">
+                            <i class="fas fa-file-csv me-2"></i>Tabla CSV
+                        </button>
+                        
+                        <button type="button" class="btn btn-outline-primary btn-sm download-btn" onclick="printResults()">
+                            <i class="fas fa-print me-2"></i>Imprimir
+                        </button>
+                    </div>
+                    <div class="form-text mt-2">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Descarga los resultados en diferentes formatos para análisis posterior
+                    </div>
                 </div>
             </div>
 
@@ -278,6 +303,11 @@
                                                 <td
                                                     class="{% if i < resultado.pivot_history|length and row_idx == resultado.pivot_history[i][0] and col_idx == resultado.pivot_history[i][1] %}pivot-cell{% endif %}">
                                                     {{ "%.3f"|format(resultado.tableau_history[i][row_idx][col_idx]) }}
+                                                    {% if i < resultado.pivot_history|length and row_idx == resultado.pivot_history[i][0] and col_idx == resultado.pivot_history[i][1] %}
+                                                    <div class="pivot-tooltip">
+                                                        🎯 Este es el pivote elegido para la iteración {{ i + 1 }}
+                                                    </div>
+                                                    {% endif %}
                                                 </td>
                                                 {% endfor %}
                                             </tr>
@@ -987,6 +1017,63 @@
                 setTimeout(saveFormDataToLocalStorage, 100); // Pequeño delay para que se actualice variableCount
             });
         });
+    }
+
+    // Función para descargar como CSV
+    function downloadAsCSV() {
+        const resultado = {{ resultado | tojson | safe if resultado else 'null' }};
+        if (!resultado || !resultado.solution) {
+            alert('No hay resultados para descargar');
+            return;
+        }
+
+        let csvContent = "Variable,Valor\n";
+        resultado.solution.forEach((value, index) => {
+            csvContent += `x${index + 1},${value.toFixed(4)}\n`;
+        });
+        csvContent += `Valor Óptimo,${resultado.optimal_value.toFixed(4)}\n`;
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'simplex_resultado.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // Función para imprimir resultados
+    function printResults() {
+        const resultsPanel = document.querySelector('.results-panel');
+        if (!resultsPanel) {
+            alert('No hay resultados para imprimir');
+            return;
+        }
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Resultados Método Simplex</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        .results-panel { border: 2px solid #28a745; padding: 20px; border-radius: 10px; }
+                        .optimal-value-badge { background: #28a745; color: white; padding: 10px; border-radius: 5px; }
+                        table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+                        th { background-color: #f2f2f2; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Resultados del Método Simplex</h1>
+                    ${resultsPanel.innerHTML}
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.print();
     }
 </script>
 

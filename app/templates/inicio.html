@@ -2,6 +2,18 @@
 
 {% block title %}Inicio - Métodos de Optimización{% endblock %}
 
+{% block scripts %}
+<script>
+// Inicializar tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">
@@ -22,13 +34,13 @@
                 <div class="mb-3">
                     <i class="fas fa-chart-line fa-3x text-primary"></i>
                 </div>
-                <h5 class="card-title">Método Simplex</h5>
+                <h4 class="card-title fw-bold">Método Simplex</h4>
                 <p class="card-text">
                     Algoritmo clásico para resolver problemas de programación lineal estándar.
                     Ideal para problemas con restricciones de desigualdad.
                 </p>
                 <div class="mt-auto">
-                    <a href="{{ url_for('main.simplex_page') }}" class="btn btn-primary">
+                    <a href="{{ url_for('main.simplex_page') }}" class="btn btn-success" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir interfaz del Método Simplex">
                         <i class="fas fa-play me-2"></i>Resolver
                     </a>
                 </div>
@@ -40,15 +52,15 @@
         <div class="card method-card h-100">
             <div class="card-body text-center">
                 <div class="mb-3">
-                    <i class="fas fa-infinity fa-3x text-success"></i>
+                    <i class="fas fa-infinity fa-3x text-info"></i>
                 </div>
-                <h5 class="card-title">Método Gran M</h5>
+                <h4 class="card-title fw-bold">Método Gran M</h4>
                 <p class="card-text">
                     Utiliza variables artificiales con penalización para resolver problemas
                     con restricciones de igualdad y desigualdad.
                 </p>
                 <div class="mt-auto">
-                    <a href="{{ url_for('main.granm_page') }}" class="btn btn-success">
+                    <a href="{{ url_for('main.granm_page') }}" class="btn btn-success" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir interfaz del Método Gran M">
                         <i class="fas fa-play me-2"></i>Resolver
                     </a>
                 </div>
@@ -62,13 +74,13 @@
                 <div class="mb-3">
                     <i class="fas fa-layer-group fa-3x text-warning"></i>
                 </div>
-                <h5 class="card-title">Método Dos Fases</h5>
+                <h4 class="card-title fw-bold">Método Dos Fases</h4>
                 <p class="card-text">
                     Resuelve el problema en dos etapas: primero encuentra una solución factible,
                     luego optimiza la función objetivo.
                 </p>
                 <div class="mt-auto">
-                    <a href="{{ url_for('main.dosfases_page') }}" class="btn btn-warning text-dark">
+                    <a href="{{ url_for('main.dosfases_page') }}" class="btn btn-success" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir interfaz del Método Dos Fases">
                         <i class="fas fa-play me-2"></i>Resolver
                     </a>
                 </div>
@@ -77,7 +89,7 @@
     </div>
 </div>
 
-<div class="row mt-5">
+<div class="row mt-6" style="margin-top: 4rem;">
     <div class="col-12">
         <div class="card">
             <div class="card-header bg-info text-white">
@@ -88,19 +100,19 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-6">
-                        <h6><i class="fas fa-edit text-primary me-2"></i>Formato de Entrada</h6>
-                        <ul>
-                            <li><strong>Función Objetivo (c):</strong> Separar coeficientes con comas. Ej: 3,2,1</li>
-                            <li><strong>Matriz A:</strong> Una fila por línea, coeficientes separados por comas</li>
-                            <li><strong>Vector b:</strong> Separar valores con comas. Ej: 12,8,6</li>
+                        <h6><i class="fas fa-keyboard text-primary me-2"></i>📝 Formato de Entrada</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2"><i class="fas fa-arrow-right text-muted me-2"></i><strong>Función Objetivo (c):</strong> Separar coeficientes con comas. <br><code class="text-primary">Ej: 3,2,1</code></li>
+                            <li class="mb-2"><i class="fas fa-arrow-right text-muted me-2"></i><strong>Matriz A:</strong> Una fila por línea, coeficientes separados por comas</li>
+                            <li class="mb-2"><i class="fas fa-arrow-right text-muted me-2"></i><strong>Vector b:</strong> Separar valores con comas. <br><code class="text-success">Ej: 12,8,6</code></li>
                         </ul>
                     </div>
                     <div class="col-md-6">
-                        <h6><i class="fas fa-lightbulb text-warning me-2"></i>Consejos</h6>
-                        <ul>
-                            <li>Marca "Mostrar iteraciones" para ver el proceso paso a paso</li>
-                            <li>Para Gran M y Dos Fases, especifica restricciones de igualdad</li>
-                            <li>Los índices de restricciones empiezan desde 0</li>
+                        <h6><i class="fas fa-lightbulb text-warning me-2"></i>💡 Consejos</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Marca <code>"Mostrar iteraciones"</code> para ver el proceso paso a paso</li>
+                            <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Para Gran M y Dos Fases, especifica restricciones de igualdad</li>
+                            <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>Los índices de restricciones empiezan desde <code>0</code></li>
                         </ul>
                     </div>
                 </div>

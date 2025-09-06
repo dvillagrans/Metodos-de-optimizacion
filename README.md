@@ -2,6 +2,12 @@
 
 Aplicación Flask para resolver problemas de programación lineal usando distintos métodos de optimización y visualizar los resultados mediante animaciones generadas con Manim.
 
+## Interfaz de la Aplicación
+
+![Interfaz de Métodos de Optimización](393_1x_shots_so.png)
+
+*Interfaz principal de la aplicación mostrando los tres métodos de optimización disponibles: Simplex, Gran M y Dos Fases.*
+
 ## Características
 
 - Implementación de diferentes métodos de optimización:
